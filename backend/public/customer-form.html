@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ai-POS - 顧客登録・編集</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .header .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #218838;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .breadcrumb {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        .form-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .form-header {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .form-header h2 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-content {
+            padding: 2rem;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-group label.required::after {
+            content: ' *';
+            color: #dc3545;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .form-actions {
+            padding: 1.5rem 2rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            border-left: 4px solid #c33;
+        }
+        
+        .success-message {
+            background: #efe;
+            color: #363;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            border-left: 4px solid #363;
+        }
+        
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-actions {
+                flex-direction: column-reverse;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 id="pageTitle">Ai-POS - 顧客登録</h1>
+        <div class="actions">
+            <span id="userDisplay">テストユーザー</span>
+            <a href="/customer-search.html" class="btn btn-secondary">検索に戻る</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="/customer-search.html">顧客検索</a> > <span id="breadcrumbText">顧客登録</span>
+        </div>
+
+        <div id="loadingMessage" class="loading" style="display: none;">
+            顧客情報を読み込み中...
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        <div id="successMessage" class="success-message" style="display: none;"></div>
+
+        <div id="formContainer" class="form-container">
+            <div class="form-header">
+                <h2 id="formTitle">顧客登録</h2>
+            </div>
+
+            <form id="customerForm" class="form-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="lastName" class="required">姓</label>
+                        <input type="text" id="lastName" name="lastName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="firstName" class="required">名</label>
+                        <input type="text" id="firstName" name="firstName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lastNameKana" class="required">姓（カナ）</label>
+                        <input type="text" id="lastNameKana" name="lastNameKana" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="firstNameKana" class="required">名（カナ）</label>
+                        <input type="text" id="firstNameKana" name="firstNameKana" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gender">性別</label>
+                        <select id="gender" name="gender">
+                            <option value="">選択してください</option>
+                            <option value="male">男性</option>
+                            <option value="female">女性</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="birthDate">生年月日</label>
+                        <input type="date" id="birthDate" name="birthDate">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone">電話番号</label>
+                        <input type="tel" id="phone" name="phone">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="mobile">携帯番号</label>
+                        <input type="tel" id="mobile" name="mobile">
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="email">メールアドレス</label>
+                        <input type="email" id="email" name="email" pattern="[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}" title="正しいメールアドレス形式で入力してください（例：user@example.com）">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="postalCode">郵便番号</label>
+                        <input type="text" id="postalCode" name="postalCode" placeholder="000-0000">
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="address">住所</label>
+                        <textarea id="address" name="address"></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="notes">メモ</label>
+                        <textarea id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="storeId" class="required">所属店舗</label>
+                        <select id="storeId" name="storeId" required>
+                            <option value="">選択してください</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+
+            <div class="form-actions">
+                <button type="button" id="cancelBtn" class="btn btn-secondary">キャンセル</button>
+                <button type="submit" form="customerForm" id="saveBtn" class="btn btn-primary">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // URL パラメータから顧客IDと操作モードを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const customerId = urlParams.get('id');
+        const isEditMode = !!customerId;
+
+        // ページ初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePage();
+            
+            // 店舗一覧を先に読み込む
+            loadStores().then(() => {
+                // 店舗一覧読み込み後に顧客データを読み込み（編集モードの場合）
+                if (isEditMode) {
+                    loadCustomerData();
+                }
+            });
+        });
+
+        // ページ初期化
+        function initializePage() {
+            // 認証情報の確認
+            const userInfo = localStorage.getItem('userInfo');
+            if (userInfo) {
+                const user = JSON.parse(userInfo);
+                document.getElementById('userDisplay').textContent = `${user.name} (${user.store.name})`;
+            }
+
+            // 編集モードの場合の表示調整
+            if (isEditMode) {
+                document.getElementById('pageTitle').textContent = 'Ai-POS - 顧客編集';
+                document.getElementById('breadcrumbText').textContent = '顧客編集';
+                document.getElementById('formTitle').textContent = '顧客編集';
+            }
+
+            // フォーム送信イベント
+            document.getElementById('customerForm').addEventListener('submit', handleFormSubmit);
+
+            // キャンセルボタンイベント
+            document.getElementById('cancelBtn').addEventListener('click', function() {
+                if (isEditMode) {
+                    window.location.href = `/customer-detail.html?id=${customerId}`;
+                } else {
+                    window.location.href = '/customer-search.html';
+                }
+            });
+        }
+
+        // 店舗一覧読み込み
+        async function loadStores() {
+            try {
+                const token = localStorage.getItem('authToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch('http://localhost:3001/api/stores', {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    populateStoreOptions(data.data);
+                } else {
+                    throw new Error(data.error?.message || '店舗一覧の取得に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('店舗一覧読み込みエラー:', error);
+                showError(`店舗一覧の取得に失敗しました: ${error.message}`);
+            }
+        }
+
+        // 店舗選択肢を設定
+        function populateStoreOptions(stores) {
+            const storeSelect = document.getElementById('storeId');
+            
+            // 既存の選択肢をクリア（"選択してください"以外）
+            storeSelect.innerHTML = '<option value="">選択してください</option>';
+            
+            // 店舗選択肢を追加
+            stores.forEach(store => {
+                const option = document.createElement('option');
+                option.value = store.id;
+                option.textContent = `${store.name} (${store.storeCode})`;
+                storeSelect.appendChild(option);
+            });
+        }
+
+        // 顧客データ読み込み（編集モードの場合）
+        async function loadCustomerData() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            const formContainer = document.getElementById('formContainer');
+
+            try {
+                loadingMessage.style.display = 'block';
+                formContainer.style.display = 'none';
+
+                const token = localStorage.getItem('authToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`http://localhost:3001/api/customers/${customerId}`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    populateForm(data.data);
+                    loadingMessage.style.display = 'none';
+                    formContainer.style.display = 'block';
+                } else {
+                    throw new Error(data.error?.message || '顧客情報の取得に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('顧客データ読み込みエラー:', error);
+                showError(`顧客情報の取得に失敗しました: ${error.message}`);
+                loadingMessage.style.display = 'none';
+            }
+        }
+
+        // フォームに顧客データを設定
+        function populateForm(customer) {
+            // 姓名を分割（スペースで区切られていることを想定）
+            const nameParts = customer.fullName.split(' ');
+            const kanaNameParts = customer.fullNameKana.split(' ');
+
+            document.getElementById('lastName').value = nameParts[0] || '';
+            document.getElementById('firstName').value = nameParts[1] || '';
+            document.getElementById('lastNameKana').value = kanaNameParts[0] || '';
+            document.getElementById('firstNameKana').value = kanaNameParts[1] || '';
+            
+            // 性別の設定
+            document.getElementById('gender').value = customer.gender || '';
+            
+            // 生年月日の設定
+            if (customer.birthDate) {
+                const date = new Date(customer.birthDate);
+                const dateStr = date.getFullYear() + '-' + 
+                              String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                              String(date.getDate()).padStart(2, '0');
+                document.getElementById('birthDate').value = dateStr;
+            }
+            
+            document.getElementById('phone').value = customer.phone || '';
+            document.getElementById('mobile').value = customer.mobile || '';
+            document.getElementById('email').value = customer.email || '';
+            document.getElementById('postalCode').value = customer.postalCode || '';
+            document.getElementById('address').value = customer.address || '';
+            document.getElementById('notes').value = customer.notes || '';
+            
+            // 所属店舗の設定
+            document.getElementById('storeId').value = customer.storeId || '';
+        }
+
+        // フォーム送信処理
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const saveBtn = document.getElementById('saveBtn');
+            const originalText = saveBtn.textContent;
+
+            try {
+                saveBtn.disabled = true;
+                saveBtn.textContent = '保存中...';
+
+                const formData = new FormData(event.target);
+                const customerData = {
+                    lastName: formData.get('lastName'),
+                    firstName: formData.get('firstName'),
+                    lastNameKana: formData.get('lastNameKana'),
+                    firstNameKana: formData.get('firstNameKana'),
+                    gender: formData.get('gender'),
+                    birthDate: formData.get('birthDate'),
+                    phone: formData.get('phone'),
+                    mobile: formData.get('mobile'),
+                    email: formData.get('email'),
+                    postalCode: formData.get('postalCode'),
+                    address: formData.get('address'),
+                    notes: formData.get('notes'),
+                    storeId: formData.get('storeId')
+                };
+
+                const token = localStorage.getItem('authToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                let response;
+                if (isEditMode) {
+                    // 更新
+                    response = await fetch(`http://localhost:3001/api/customers/${customerId}`, {
+                        method: 'PUT',
+                        headers: headers,
+                        body: JSON.stringify(customerData)
+                    });
+                } else {
+                    // 新規作成
+                    response = await fetch('http://localhost:3001/api/customers', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(customerData)
+                    });
+                }
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'APIエラーが発生しました');
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(isEditMode ? '顧客情報を更新しました' : '顧客を登録しました');
+                    
+                    // 2秒後に適切な画面に遷移
+                    setTimeout(() => {
+                        if (isEditMode) {
+                            window.location.href = `/customer-detail.html?id=${customerId}`;
+                        } else {
+                            window.location.href = `/customer-detail.html?id=${data.data.id}`;
+                        }
+                    }, 2000);
+                } else {
+                    throw new Error(data.error?.message || '保存に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('フォーム送信エラー:', error);
+                showError(`保存に失敗しました: ${error.message}`);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
+        }
+
+        // エラー表示
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            successMessage.style.display = 'none';
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            
+            // 上部にスクロール
+            window.scrollTo(0, 0);
+        }
+
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            errorMessage.style.display = 'none';
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            
+            // 上部にスクロール
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>

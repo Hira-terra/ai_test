@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>顧客検索 - 眼鏡店顧客管理システム</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background-color: #1976d2;
+        }
+        
+        .nav-wrapper {
+            padding: 0 24px;
+        }
+        
+        .brand-logo {
+            font-size: 20px;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* Search Section */
+        .search-section {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .search-section h5 {
+            margin: 0 0 24px 0;
+            font-size: 24px;
+            font-weight: 400;
+            text-align: center;
+        }
+        
+        .search-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .search-input {
+            position: relative;
+        }
+        
+        .search-input .input-field input {
+            font-size: 18px;
+            height: 60px;
+            padding-left: 60px;
+        }
+        
+        .search-input .prefix {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            font-size: 24px;
+            color: #666;
+        }
+        
+        .search-options {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+        
+        .search-btn {
+            width: 200px;
+            height: 48px;
+            font-size: 16px;
+            text-transform: none;
+        }
+        
+        /* Results Section */
+        .results-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .results-container {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        
+        .results-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .results-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .results-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .results-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .results-count {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .customer-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .customer-card:hover {
+            background-color: #f8f9fa;
+            border-color: #1976d2;
+        }
+        
+        .customer-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .customer-basic {
+            flex: 1;
+        }
+        
+        .customer-name {
+            font-size: 18px;
+            font-weight: 500;
+            margin: 0 0 8px 0;
+        }
+        
+        .customer-details {
+            color: #666;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+        
+        .customer-stats {
+            text-align: right;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .last-visit {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+        }
+        
+        .btn-floating.btn-large {
+            width: 64px;
+            height: 64px;
+        }
+        
+        .btn-floating.btn-large i {
+            line-height: 64px;
+        }
+        
+        /* Tablet optimizations */
+        @media (max-width: 992px) {
+            .customer-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            .customer-stats {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="#" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    眼鏡店顧客管理システム
+                </a>
+                <ul class="right">
+                    <li><a href="#"><i class="material-icons left">store</i>新宿本店</a></li>
+                    <li><a href="#"><i class="material-icons left">person</i>田中花子</a></li>
+                    <li><a href="/logout"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Search Section -->
+        <div class="search-section">
+            <h5>顧客検索</h5>
+            <div class="search-form">
+                <!-- Main Search Input -->
+                <div class="search-input">
+                    <div class="input-field">
+                        <i class="material-icons prefix">search</i>
+                        <input type="text" id="searchQuery" placeholder="お名前・フリガナ、電話番号、カルテ番号で検索">
+                    </div>
+                </div>
+                
+                <!-- Additional Search Fields -->
+                <div class="additional-search" style="display: none; margin-top: 16px;">
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">phone</i>
+                            <input type="text" id="phoneQuery" placeholder="電話番号">
+                        </div>
+                        <div class="input-field col s6">
+                            <i class="material-icons prefix">location_on</i>
+                            <input type="text" id="addressQuery" placeholder="住所（一部）">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="search-options">
+                    <div style="margin-bottom: 16px;">
+                        <label>
+                            <input type="radio" name="searchType" value="simple" checked />
+                            <span>簡単検索</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="searchType" value="detailed" />
+                            <span>詳細検索（AND条件）</span>
+                        </label>
+                    </div>
+                    
+                    <div class="search-scope" style="border-top: 1px solid #e0e0e0; padding-top: 16px;">
+                        <span style="color: #666; font-size: 14px; margin-right: 16px;">検索範囲:</span>
+                        <label>
+                            <input type="checkbox" id="searchMyStore" checked />
+                            <span>自店舗のみ (新宿本店)</span>
+                        </label>
+                        <label style="margin-left: 24px;">
+                            <input type="checkbox" id="searchAllStores" />
+                            <span>全店舗</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 24px;">
+                    <button class="btn search-btn waves-effect waves-light blue darken-2" id="searchBtn">
+                        <i class="material-icons left">search</i>
+                        検索
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h6>検索結果</h6>
+                <span class="results-count" id="resultsCount">15件見つかりました</span>
+            </div>
+            
+            <div class="results-container">
+                <div id="customerList">
+                    <!-- Customer Cards will be populated here -->
+                    <div class="customer-card" onclick="goToCustomerDetail(1001)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 太郎</p>
+                                <p class="customer-details">📞 03-1234-5678</p>
+                                <p class="customer-details">🎂 1980年5月15日 (44歳)</p>
+                                <p class="customer-details">🏪 新宿本店</p>
+                                <p class="customer-details">カルテ番号: C-1001</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-15</p>
+                                <p>購入回数: 3回</p>
+                                <p>累計購入額: ¥126,500</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1002)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 花子</p>
+                                <p class="customer-details">📞 03-2345-6789</p>
+                                <p class="customer-details">🎂 1975年12月8日 (48歳)</p>
+                                <p class="customer-details">🏪 渋谷店</p>
+                                <p class="customer-details">カルテ番号: C-1002</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-08-01</p>
+                                <p>購入回数: 1回</p>
+                                <p>累計購入額: ¥45,800</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1003)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 一郎</p>
+                                <p class="customer-details">📞 03-3456-7890</p>
+                                <p class="customer-details">🎂 1992年3月22日 (32歳)</p>
+                                <p class="customer-details">🏪 池袋店</p>
+                                <p class="customer-details">カルテ番号: C-1003</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-28</p>
+                                <p>購入回数: 5回</p>
+                                <p>累計購入額: ¥285,600</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1004)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 美咲</p>
+                                <p class="customer-details">📞 03-4567-8901</p>
+                                <p class="customer-details">🎂 1988年7月14日 (36歳)</p>
+                                <p class="customer-details">🏪 銀座店</p>
+                                <p class="customer-details">カルテ番号: C-1004</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-20</p>
+                                <p>購入回数: 2回</p>
+                                <p>累計購入額: ¥89,600</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1005)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 健一</p>
+                                <p class="customer-details">📞 03-5678-9012</p>
+                                <p class="customer-details">🎂 1965年11月30日 (58歳)</p>
+                                <p class="customer-details">🏪 横浜店</p>
+                                <p class="customer-details">カルテ番号: C-1005</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-06-15</p>
+                                <p>購入回数: 8回</p>
+                                <p>累計購入額: ¥456,800</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1006)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 由美</p>
+                                <p class="customer-details">📞 03-6789-0123</p>
+                                <p class="customer-details">🎂 1993年9月5日 (30歳)</p>
+                                <p class="customer-details">🏪 新宿本店</p>
+                                <p class="customer-details">カルテ番号: C-1006</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-08-03</p>
+                                <p>購入回数: 1回</p>
+                                <p>累計購入額: ¥32,400</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1007)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 修</p>
+                                <p class="customer-details">📞 03-7890-1234</p>
+                                <p class="customer-details">🎂 1978年1月18日 (46歳)</p>
+                                <p class="customer-details">🏪 渋谷店</p>
+                                <p class="customer-details">カルテ番号: C-1007</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-10</p>
+                                <p>購入回数: 4回</p>
+                                <p>累計購入額: ¥198,500</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1008)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 愛子</p>
+                                <p class="customer-details">📞 03-8901-2345</p>
+                                <p class="customer-details">🎂 1985年4月25日 (39歳)</p>
+                                <p class="customer-details">🏪 池袋店</p>
+                                <p class="customer-details">カルテ番号: C-1008</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-05</p>
+                                <p>購入回数: 6回</p>
+                                <p>累計購入額: ¥312,900</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1009)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 隆志</p>
+                                <p class="customer-details">📞 03-9012-3456</p>
+                                <p class="customer-details">🎂 1970年8月12日 (54歳)</p>
+                                <p class="customer-details">🏪 銀座店</p>
+                                <p class="customer-details">カルテ番号: C-1009</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-06-28</p>
+                                <p>購入回数: 7回</p>
+                                <p>累計購入額: ¥389,200</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1010)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 真理子</p>
+                                <p class="customer-details">📞 03-0123-4567</p>
+                                <p class="customer-details">🎂 1982年6月9日 (42歳)</p>
+                                <p class="customer-details">🏪 横浜店</p>
+                                <p class="customer-details">カルテ番号: C-1010</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-25</p>
+                                <p>購入回数: 3回</p>
+                                <p>累計購入額: ¥156,700</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1011)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 大輔</p>
+                                <p class="customer-details">📞 03-1234-5670</p>
+                                <p class="customer-details">🎂 1995年2月14日 (29歳)</p>
+                                <p class="customer-details">🏪 新宿本店</p>
+                                <p class="customer-details">カルテ番号: C-1011</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-08-02</p>
+                                <p>購入回数: 2回</p>
+                                <p>累計購入額: ¥74,300</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1012)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 麻衣</p>
+                                <p class="customer-details">📞 03-2345-6781</p>
+                                <p class="customer-details">🎂 1987年10月3日 (36歳)</p>
+                                <p class="customer-details">🏪 渋谷店</p>
+                                <p class="customer-details">カルテ番号: C-1012</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-18</p>
+                                <p>購入回数: 4回</p>
+                                <p>累計購入額: ¥223,400</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1013)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 正夫</p>
+                                <p class="customer-details">📞 03-3456-7892</p>
+                                <p class="customer-details">🎂 1963年12月21日 (60歳)</p>
+                                <p class="customer-details">🏪 池袋店</p>
+                                <p class="customer-details">カルテ番号: C-1013</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-06-10</p>
+                                <p>購入回数: 9回</p>
+                                <p>累計購入額: ¥523,800</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1014)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 恵子</p>
+                                <p class="customer-details">📞 03-4567-8903</p>
+                                <p class="customer-details">🎂 1990年5月7日 (34歳)</p>
+                                <p class="customer-details">🏪 銀座店</p>
+                                <p class="customer-details">カルテ番号: C-1014</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-07-30</p>
+                                <p>購入回数: 2回</p>
+                                <p>累計購入額: ¥92,100</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="customer-card" onclick="goToCustomerDetail(1015)">
+                        <div class="customer-info">
+                            <div class="customer-basic">
+                                <p class="customer-name">山田 博</p>
+                                <p class="customer-details">📞 03-5678-9014</p>
+                                <p class="customer-details">🎂 1972年9月16日 (51歳)</p>
+                                <p class="customer-details">🏪 横浜店</p>
+                                <p class="customer-details">カルテ番号: C-1015</p>
+                            </div>
+                            <div class="customer-stats">
+                                <p class="last-visit">最終来店: 2024-06-25</p>
+                                <p>購入回数: 6回</p>
+                                <p>累計購入額: ¥367,500</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a class="btn-floating btn-large green waves-effect waves-light" onclick="addNewCustomer()">
+            <i class="material-icons">person_add</i>
+        </a>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Initialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            // Focus on search input
+            document.getElementById('searchQuery').focus();
+        });
+        
+        // Search type handling
+        document.querySelectorAll('input[name="searchType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const additionalSearch = document.querySelector('.additional-search');
+                const mainSearchInput = document.getElementById('searchQuery');
+                
+                if (this.value === 'detailed') {
+                    additionalSearch.style.display = 'block';
+                    mainSearchInput.placeholder = 'お名前・フリガナ';
+                } else {
+                    additionalSearch.style.display = 'none';
+                    mainSearchInput.placeholder = 'お名前・フリガナ、電話番号、カルテ番号で検索';
+                    // Clear additional fields
+                    document.getElementById('phoneQuery').value = '';
+                    document.getElementById('addressQuery').value = '';
+                }
+            });
+        });
+        
+        // Search scope handling
+        document.getElementById('searchMyStore').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('searchAllStores').checked = false;
+            }
+        });
+        
+        document.getElementById('searchAllStores').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('searchMyStore').checked = false;
+            }
+        });
+        
+        // Search functionality
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+        
+        function performSearch() {
+            const searchType = document.querySelector('input[name="searchType"]:checked').value;
+            const mainQuery = document.getElementById('searchQuery').value.trim();
+            const phoneQuery = document.getElementById('phoneQuery').value.trim();
+            const addressQuery = document.getElementById('addressQuery').value.trim();
+            const searchMyStore = document.getElementById('searchMyStore').checked;
+            const searchAllStores = document.getElementById('searchAllStores').checked;
+            
+            // Validation
+            if (searchType === 'simple') {
+                if (!mainQuery) {
+                    M.toast({html: '検索キーワードを入力してください'});
+                    return;
+                }
+            } else {
+                if (!mainQuery && !phoneQuery && !addressQuery) {
+                    M.toast({html: '検索条件を1つ以上入力してください'});
+                    return;
+                }
+            }
+            
+            if (!searchMyStore && !searchAllStores) {
+                M.toast({html: '検索範囲を選択してください'});
+                return;
+            }
+            
+            // Show loading state
+            const searchBtn = document.getElementById('searchBtn');
+            const scope = searchAllStores ? '全店舗' : '新宿本店';
+            searchBtn.innerHTML = '<i class="material-icons left">refresh</i>検索中...';
+            searchBtn.disabled = true;
+            
+            // Build search conditions display
+            let searchConditions = [];
+            if (mainQuery) searchConditions.push(`名前: ${mainQuery}`);
+            if (phoneQuery) searchConditions.push(`電話: ${phoneQuery}`);
+            if (addressQuery) searchConditions.push(`住所: ${addressQuery}`);
+            
+            // Simulate API call
+            setTimeout(() => {
+                // Update results count based on scope and search type
+                let baseCount = searchAllStores ? 15 : 8;
+                if (searchType === 'detailed') {
+                    // Detailed search typically returns fewer results
+                    baseCount = Math.max(1, Math.floor(baseCount / 2));
+                }
+                
+                const resultsCount = `${baseCount}件見つかりました (${scope})`;
+                document.getElementById('resultsCount').textContent = resultsCount;
+                
+                // Show results
+                document.getElementById('resultsSection').style.display = 'block';
+                
+                // Reset button
+                searchBtn.innerHTML = '<i class="material-icons left">search</i>検索';
+                searchBtn.disabled = false;
+                
+                // Show toast with search info
+                const searchInfo = searchType === 'detailed' 
+                    ? `詳細検索完了 (${searchConditions.join(' & ')})`
+                    : `${scope}から検索完了`;
+                M.toast({html: searchInfo});
+                
+                // Scroll to results
+                document.getElementById('resultsSection').scrollIntoView({ 
+                    behavior: 'smooth' 
+                });
+            }, 800);
+        }
+        
+        function goToCustomerDetail(customerId) {
+            console.log('Navigate to customer detail:', customerId);
+            // In real app: window.location.href = `/customers/${customerId}`;
+            M.toast({html: `顧客詳細ページへ移動 (ID: ${customerId})`});
+        }
+        
+        function addNewCustomer() {
+            console.log('Add new customer');
+            // In real app: window.location.href = '/customers/new';
+            M.toast({html: '新規顧客登録ページへ移動'});
+        }
+        
+        // Auto-hide results when search query changes
+        document.getElementById('searchQuery').addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                document.getElementById('resultsSection').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

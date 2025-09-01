@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>眼鏡店顧客管理システム - ログイン</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .logo-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .logo-section i {
+            font-size: 48px;
+            color: #1976d2;
+        }
+        
+        .logo-section h4 {
+            margin: 16px 0 0 0;
+            color: #333;
+            font-weight: 400;
+        }
+        
+        .login-form {
+            margin-top: 32px;
+        }
+        
+        .input-field {
+            margin-bottom: 24px;
+        }
+        
+        .btn-login {
+            width: 100%;
+            height: 48px;
+            font-size: 16px;
+            text-transform: none;
+            margin-top: 32px;
+        }
+        
+        .error-message {
+            color: #d32f2f;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+        
+        .remember-section {
+            margin-top: 16px;
+        }
+        
+        select {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo-section">
+            <i class="material-icons">remove_red_eye</i>
+            <h4>眼鏡店顧客管理システム</h4>
+        </div>
+        
+        <form class="login-form" id="loginForm">
+            <div class="input-field">
+                <i class="material-icons prefix">person</i>
+                <input type="text" id="userId" name="userId" required>
+                <label for="userId">ユーザーID</label>
+            </div>
+            
+            <div class="input-field">
+                <i class="material-icons prefix">lock</i>
+                <input type="password" id="password" name="password" required>
+                <label for="password">パスワード</label>
+            </div>
+            
+            <div class="input-field">
+                <i class="material-icons prefix">store</i>
+                <select id="storeId" name="storeId" required>
+                    <option value="" disabled selected>店舗を選択</option>
+                </select>
+            </div>
+            
+            <p class="error-message" id="errorMessage"></p>
+            
+            <label class="remember-section">
+                <input type="checkbox" id="rememberMe" />
+                <span>ログイン情報を記憶する</span>
+            </label>
+            
+            <button type="submit" class="btn btn-login waves-effect waves-light blue darken-2">
+                ログイン
+                <i class="material-icons right">arrow_forward</i>
+            </button>
+        </form>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Initialize Materialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            // 店舗一覧を読み込み
+            loadStores();
+            
+            M.FormSelect.init(document.querySelectorAll('select'));
+            
+            // Load saved login info
+            const savedUserId = localStorage.getItem('savedUserId');
+            const savedStoreId = localStorage.getItem('savedStoreId');
+            
+            if (savedUserId) {
+                document.getElementById('userId').value = savedUserId;
+                M.updateTextFields();
+            }
+            
+            if (savedStoreId) {
+                const selectElement = document.getElementById('storeId');
+                selectElement.value = savedStoreId;
+                M.FormSelect.init(selectElement);
+            }
+            
+            // Focus on password field if userId is pre-filled
+            if (savedUserId) {
+                document.getElementById('password').focus();
+            }
+        });
+        
+        // 店舗一覧を読み込む関数
+        async function loadStores() {
+            try {
+                const response = await fetch('http://localhost:3001/api/stores');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const storeSelect = document.getElementById('storeId');
+                    // 既存のオプション（「店舗を選択」）以外を削除
+                    while (storeSelect.children.length > 1) {
+                        storeSelect.removeChild(storeSelect.lastChild);
+                    }
+                    
+                    // 新しい店舗オプションを追加
+                    data.data.forEach(store => {
+                        const option = document.createElement('option');
+                        option.value = store.id;
+                        option.textContent = store.name;
+                        storeSelect.appendChild(option);
+                    });
+                    
+                    // Materialize selectを再初期化
+                    M.FormSelect.init(storeSelect);
+                }
+            } catch (error) {
+                console.error('店舗データの読み込みに失敗しました:', error);
+                // エラーの場合はデフォルトの店舗を表示
+                const storeSelect = document.getElementById('storeId');
+                const option = document.createElement('option');
+                option.value = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+                option.textContent = '新宿本店（デフォルト）';
+                storeSelect.appendChild(option);
+                M.FormSelect.init(storeSelect);
+            }
+        }
+        
+        // Handle form submission
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('userId').value;
+            const password = document.getElementById('password').value;
+            const storeId = document.getElementById('storeId').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            
+            // Clear previous error
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.style.display = 'none';
+            errorElement.textContent = '';
+            
+            // Simple validation
+            if (!userId || !password || !storeId) {
+                errorElement.textContent = 'すべての項目を入力してください';
+                errorElement.style.display = 'block';
+                return;
+            }
+            
+            // Save login info if requested
+            if (rememberMe) {
+                localStorage.setItem('savedUserId', userId);
+                localStorage.setItem('savedStoreId', storeId);
+            } else {
+                localStorage.removeItem('savedUserId');
+                localStorage.removeItem('savedStoreId');
+            }
+            
+            // 実際のAPI呼び出し
+            loginToAPI(userId, password, storeId);
+        });
+        
+        // API呼び出し関数
+        async function loginToAPI(userCode, password, storeId) {
+            const submitButton = document.querySelector('.btn-login');
+            const errorElement = document.getElementById('errorMessage');
+            
+            // ローディング状態
+            submitButton.disabled = true;
+            submitButton.textContent = 'ログイン中...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_code: userCode,
+                        password: password,
+                        store_code: storeId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // ログイン成功
+                    console.log('Login successful:', data);
+                    
+                    // トークンを保存
+                    localStorage.setItem('accessToken', data.data.access_token);
+                    localStorage.setItem('refreshToken', data.data.refresh_token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    
+                    // 成功メッセージ
+                    errorElement.style.color = '#2e7d32';
+                    errorElement.textContent = 'ログイン成功！';
+                    errorElement.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        // 権限に基づいてリダイレクト
+                        if (data.data.user.role === 'hq_admin') {
+                            window.location.href = '/static/customer-search.html';
+                        } else if (data.data.user.role === 'store_manager') {
+                            window.location.href = '/static/customer-search.html';
+                        } else {
+                            window.location.href = '/static/customer-search.html';
+                        }
+                    }, 1000);
+                    
+                } else {
+                    // ログイン失敗
+                    errorElement.style.color = '#d32f2f';
+                    errorElement.textContent = data.error?.message || 'ログインに失敗しました';
+                    errorElement.style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                errorElement.style.color = '#d32f2f';
+                errorElement.textContent = 'サーバーに接続できません';
+                errorElement.style.display = 'block';
+            } finally {
+                // ローディング状態を解除
+                submitButton.disabled = false;
+                submitButton.textContent = 'ログイン';
+            }
+        }
+    </script>
+</body>
+</html>

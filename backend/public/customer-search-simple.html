@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ai-POS - 顧客検索</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .header .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #218838;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .search-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+        
+        .search-header {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .search-header h2 {
+            color: #333;
+            margin: 0;
+        }
+        
+        .search-content {
+            padding: 2rem;
+        }
+        
+        .search-form {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: end;
+        }
+        
+        .search-input {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .search-input label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+        
+        .search-input input {
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .search-btn {
+            padding: 0.75rem 1.5rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .search-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .results-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: none;
+        }
+        
+        .results-header {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .results-header h3 {
+            color: #333;
+            margin: 0;
+        }
+        
+        .results-count {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .results-content {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .customer-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .customer-table th,
+        .customer-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .customer-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+        }
+        
+        .customer-table tr:hover {
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+        
+        .customer-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .customer-code {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .customer-phone {
+            color: #555;
+        }
+        
+        .customer-store {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .last-visit {
+            color: #333;
+        }
+        
+        .total-amount {
+            font-weight: 600;
+            color: #2e7d32;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .quick-actions {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+        }
+        
+        .fab {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #28a745;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.3s;
+        }
+        
+        .fab:hover {
+            background: #218838;
+            transform: scale(1.1);
+        }
+        
+        @media (max-width: 768px) {
+            .search-form {
+                grid-template-columns: 1fr;
+            }
+            
+            .customer-table {
+                font-size: 0.85rem;
+            }
+            
+            .customer-table th,
+            .customer-table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Ai-POS - 顧客検索</h1>
+        <div class="actions">
+            <span id="userDisplay">テストユーザー</span>
+            <button class="btn btn-primary" onclick="addNewCustomer()">新規登録</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Search Section -->
+        <div class="search-section">
+            <div class="search-header">
+                <h2>顧客検索</h2>
+            </div>
+            <div class="search-content">
+                <div class="search-form">
+                    <div class="search-input">
+                        <label for="searchQuery">検索キーワード</label>
+                        <input type="text" id="searchQuery" placeholder="お名前、フリガナ、電話番号、顧客コードで検索">
+                    </div>
+                    <button class="search-btn" onclick="performSearch()">検索</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingMessage" class="loading" style="display: none;">
+            検索中...
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h3>検索結果</h3>
+                <span class="results-count" id="resultsCount">0件</span>
+            </div>
+            <div class="results-content">
+                <table class="customer-table">
+                    <thead>
+                        <tr>
+                            <th>顧客名</th>
+                            <th>電話番号</th>
+                            <th>所属店舗</th>
+                            <th>最終来店日</th>
+                            <th>累計購入額</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customerTableBody">
+                        <!-- Results will be populated here -->
+                        <tr onclick="goToCustomerDetail('C-1001')">
+                            <td>
+                                <div class="customer-name">山田 太郎</div>
+                                <div class="customer-code">C-1001</div>
+                            </td>
+                            <td class="customer-phone">03-1234-5678</td>
+                            <td><span class="customer-store">新宿本店</span></td>
+                            <td class="last-visit">2024-07-15</td>
+                            <td class="total-amount">¥126,500</td>
+                        </tr>
+                        <tr onclick="goToCustomerDetail('C-1002')">
+                            <td>
+                                <div class="customer-name">山田 花子</div>
+                                <div class="customer-code">C-1002</div>
+                            </td>
+                            <td class="customer-phone">03-2345-6789</td>
+                            <td><span class="customer-store">渋谷店</span></td>
+                            <td class="last-visit">2024-08-01</td>
+                            <td class="total-amount">¥45,800</td>
+                        </tr>
+                        <tr onclick="goToCustomerDetail('C-1003')">
+                            <td>
+                                <div class="customer-name">山田 一郎</div>
+                                <div class="customer-code">C-1003</div>
+                            </td>
+                            <td class="customer-phone">03-3456-7890</td>
+                            <td><span class="customer-store">池袋店</span></td>
+                            <td class="last-visit">2024-07-28</td>
+                            <td class="total-amount">¥285,600</td>
+                        </tr>
+                        <tr onclick="goToCustomerDetail('C-1004')">
+                            <td>
+                                <div class="customer-name">山田 美咲</div>
+                                <div class="customer-code">C-1004</div>
+                            </td>
+                            <td class="customer-phone">03-4567-8901</td>
+                            <td><span class="customer-store">銀座店</span></td>
+                            <td class="last-visit">2024-07-20</td>
+                            <td class="total-amount">¥89,600</td>
+                        </tr>
+                        <tr onclick="goToCustomerDetail('C-1005')">
+                            <td>
+                                <div class="customer-name">山田 健一</div>
+                                <div class="customer-code">C-1005</div>
+                            </td>
+                            <td class="customer-phone">03-5678-9012</td>
+                            <td><span class="customer-store">横浜店</span></td>
+                            <td class="last-visit">2024-06-15</td>
+                            <td class="total-amount">¥456,800</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- No Results -->
+        <div id="noResults" class="no-results" style="display: none;">
+            <h3>該当する顧客が見つかりませんでした</h3>
+            <p>検索条件を変更してお試しください</p>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <button class="fab" onclick="addNewCustomer()" title="新規顧客登録">
+            +
+        </button>
+    </div>
+
+    <script>
+        // 認証情報の確認
+        document.addEventListener('DOMContentLoaded', function() {
+            const userInfo = localStorage.getItem('user');
+            if (userInfo) {
+                const user = JSON.parse(userInfo);
+                document.getElementById('userDisplay').textContent = `${user.name} (${user.store.name})`;
+            }
+            
+            // 検索フィールドにフォーカス
+            document.getElementById('searchQuery').focus();
+            
+            // Enterキーでの検索
+            document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+        });
+
+        // 検索実行
+        async function performSearch() {
+            const query = document.getElementById('searchQuery').value.trim();
+            const loadingMessage = document.getElementById('loadingMessage');
+            const resultsSection = document.getElementById('resultsSection');
+            const noResults = document.getElementById('noResults');
+
+            if (!query) {
+                alert('検索キーワードを入力してください');
+                return;
+            }
+
+            try {
+                // ローディング表示
+                loadingMessage.style.display = 'block';
+                resultsSection.style.display = 'none';
+                noResults.style.display = 'none';
+
+                const token = localStorage.getItem('accessToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`http://localhost:3001/api/customers/search?q=${encodeURIComponent(query)}`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    displaySearchResults(data.data);
+                } else {
+                    throw new Error(data.error?.message || '検索に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('検索エラー:', error);
+                alert(`検索に失敗しました: ${error.message}`);
+            } finally {
+                loadingMessage.style.display = 'none';
+            }
+        }
+
+        // 検索結果の表示
+        function displaySearchResults(customers) {
+            const resultsSection = document.getElementById('resultsSection');
+            const noResults = document.getElementById('noResults');
+            const resultsCount = document.getElementById('resultsCount');
+            const tableBody = document.getElementById('customerTableBody');
+
+            if (customers.length === 0) {
+                resultsSection.style.display = 'none';
+                noResults.style.display = 'block';
+                return;
+            }
+
+            // 結果数の更新
+            resultsCount.textContent = `${customers.length}件`;
+
+            // テーブルのクリア
+            tableBody.innerHTML = '';
+
+            // 顧客データの追加
+            customers.forEach(customer => {
+                const row = document.createElement('tr');
+                row.onclick = () => goToCustomerDetail(customer.customerCode);
+                
+                row.innerHTML = `
+                    <td>
+                        <div class="customer-name">${customer.fullName || '-'}</div>
+                        <div class="customer-code">${customer.customerCode || '-'}</div>
+                    </td>
+                    <td class="customer-phone">${customer.phone || '-'}</td>
+                    <td><span class="customer-store">${customer.store?.name || '-'}</span></td>
+                    <td class="last-visit">${customer.lastVisitDate ? new Date(customer.lastVisitDate).toLocaleDateString('ja-JP') : '-'}</td>
+                    <td class="total-amount">${customer.totalPurchaseAmount ? `¥${parseFloat(customer.totalPurchaseAmount).toLocaleString()}` : '¥0'}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+
+            resultsSection.style.display = 'block';
+            noResults.style.display = 'none';
+        }
+
+        // 顧客詳細ページへ移動
+        function goToCustomerDetail(customerCode) {
+            // 実際のアプリでは顧客IDを使用する想定
+            const customers = JSON.parse(localStorage.getItem('searchResults') || '[]');
+            const customer = customers.find(c => c.customerCode === customerCode);
+            
+            if (customer && customer.id) {
+                window.location.href = `/customer-detail.html?id=${customer.id}`;
+            } else {
+                alert('顧客詳細情報が見つかりません');
+            }
+        }
+
+        // 新規顧客登録
+        function addNewCustomer() {
+            window.location.href = '/customer-form.html';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>顧客詳細 - 眼鏡店顧客管理システム</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <!-- Fabric.js for canvas drawing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background-color: #1976d2;
+        }
+        
+        .nav-wrapper {
+            padding: 0 24px;
+        }
+        
+        .brand-logo {
+            font-size: 20px;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Customer Header */
+        .customer-header {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .customer-title h4 {
+            margin: 0 0 8px 0;
+            font-weight: 500;
+        }
+        
+        .customer-id {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        /* Tabs */
+        .tabs-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .tabs {
+            background-color: transparent;
+        }
+        
+        .tabs .tab a {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .tabs .tab a:hover {
+            color: #1976d2;
+        }
+        
+        .tabs .tab a.active {
+            color: #1976d2;
+        }
+        
+        .tabs .indicator {
+            background-color: #1976d2;
+        }
+        
+        /* Tab Content */
+        .tab-content {
+            padding: 24px;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Basic Info Section */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .info-card h6 {
+            margin: 0 0 16px 0;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        /* Prescription History */
+        .prescription-history {
+            margin-bottom: 24px;
+        }
+        
+        .prescription-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        
+        .prescription-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .prescription-date {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .prescription-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .eye-data {
+            background: white;
+            border-radius: 4px;
+            padding: 16px;
+        }
+        
+        .eye-data h6 {
+            margin: 0 0 12px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        
+        .eye-values {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            font-size: 14px;
+        }
+        
+        .eye-values div {
+            text-align: center;
+        }
+        
+        .eye-values .label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .eye-values .value {
+            color: #333;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+        
+        /* Purchase History */
+        .purchase-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .purchase-table table {
+            margin: 0;
+        }
+        
+        .purchase-table th {
+            background-color: #f5f5f5;
+            font-weight: 500;
+        }
+        
+        /* Hand-written Notes */
+        .notes-section {
+            background: #fff9c4;
+            border-radius: 8px;
+            padding: 24px;
+            border: 2px dashed #ffc107;
+            margin-bottom: 24px;
+        }
+        
+        .notes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .notes-area {
+            min-height: 200px;
+            border: none;
+            background: transparent;
+            resize: vertical;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            width: 100%;
+            outline: none;
+        }
+        
+        /* Image Gallery */
+        .image-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .image-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+            aspect-ratio: 1;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .image-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .image-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .image-upload {
+            border: 2px dashed #1976d2;
+            background: #e3f2fd;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .image-upload:hover {
+            background: #bbdefb;
+        }
+        
+        .image-date {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        /* Image Annotation Modal */
+        .annotation-modal {
+            max-width: 90%;
+            max-height: 90%;
+        }
+        
+        .annotation-container {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        
+        .canvas-container {
+            position: relative;
+            flex: 1;
+        }
+        
+        .annotation-tools {
+            background: #f5f5f5;
+            padding: 16px;
+            border-radius: 8px;
+            width: 200px;
+        }
+        
+        .tool-button {
+            width: 100%;
+            margin-bottom: 8px;
+            text-align: left;
+        }
+        
+        .color-picker {
+            display: flex;
+            gap: 8px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+        }
+        
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .color-option.selected {
+            border-color: #333;
+            transform: scale(1.2);
+        }
+        
+        .brush-size-slider {
+            margin: 16px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .annotation-container {
+                flex-direction: column;
+            }
+            
+            .annotation-tools {
+                width: 100%;
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            
+            .tool-button {
+                width: auto;
+                flex: 1;
+            }
+        }
+        
+        /* Floating Action Button */
+        .fixed-action-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .customer-header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .prescription-data {
+                grid-template-columns: 1fr;
+            }
+            
+            .eye-values {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="/" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    眼鏡店顧客管理システム
+                </a>
+                <ul class="right">
+                    <li><a href="#"><i class="material-icons left">store</i>新宿本店</a></li>
+                    <li><a href="#"><i class="material-icons left">person</i>田中花子</a></li>
+                    <li><a href="/logout"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Customer Header -->
+        <div class="customer-header">
+            <div class="customer-title">
+                <h4>山田 太郎</h4>
+                <p class="customer-id">カルテ番号: C-1001 | 最終来店: 2024-07-15</p>
+            </div>
+            <div class="header-actions">
+                <a class="btn waves-effect waves-light green" href="/orders/new?customer=1001">
+                    <i class="material-icons left">add_shopping_cart</i>
+                    受注入力
+                </a>
+                <a class="btn waves-effect waves-light blue darken-2" onclick="editCustomer()">
+                    <i class="material-icons left">edit</i>
+                    編集
+                </a>
+            </div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <ul class="tabs">
+                <li class="tab"><a href="#basic-info" class="active">基本情報</a></li>
+                <li class="tab"><a href="#prescription">視力・度数</a></li>
+                <li class="tab"><a href="#purchase-history">購入履歴</a></li>
+                <li class="tab"><a href="#notes">メモ・画像</a></li>
+            </ul>
+            
+            <!-- Basic Info Tab -->
+            <div id="basic-info" class="tab-content active">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h6><i class="material-icons left">person</i>個人情報</h6>
+                        <div class="info-item">
+                            <span class="info-label">氏名</span>
+                            <span class="info-value">山田 太郎</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">フリガナ</span>
+                            <span class="info-value">ヤマダ タロウ</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">生年月日</span>
+                            <span class="info-value">1980年5月15日 (44歳)</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">性別</span>
+                            <span class="info-value">男性</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <h6><i class="material-icons left">contact_phone</i>連絡先</h6>
+                        <div class="info-item">
+                            <span class="info-label">電話番号</span>
+                            <span class="info-value">03-1234-5678</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">携帯番号</span>
+                            <span class="info-value">090-1234-5678</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">メール</span>
+                            <span class="info-value">yamada@example.com</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">住所</span>
+                            <span class="info-value">〒160-0023<br>東京都新宿区西新宿1-1-1</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <h6><i class="material-icons left">assessment</i>来店情報</h6>
+                        <div class="info-item">
+                            <span class="info-label">初回来店</span>
+                            <span class="info-value">2022年3月10日</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">最終来店</span>
+                            <span class="info-value">2024年7月15日</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">来店回数</span>
+                            <span class="info-value">8回</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">累計購入額</span>
+                            <span class="info-value">¥126,500</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Prescription Tab -->
+            <div id="prescription" class="tab-content">
+                <div class="prescription-history">
+                    <div class="prescription-card">
+                        <div class="prescription-header">
+                            <span class="prescription-date">2024年7月15日 測定</span>
+                            <span class="chip green white-text">最新</span>
+                        </div>
+                        <div class="prescription-data">
+                            <div class="eye-data">
+                                <h6>右眼 (R)</h6>
+                                <div class="eye-values">
+                                    <div>
+                                        <div class="label">S (球面)</div>
+                                        <div class="value">-2.50</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">C (円柱)</div>
+                                        <div class="value">-0.75</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">AX (軸)</div>
+                                        <div class="value">90°</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 12px;">
+                                    <div class="label">矯正視力</div>
+                                    <div class="value">1.2</div>
+                                </div>
+                            </div>
+                            <div class="eye-data">
+                                <h6>左眼 (L)</h6>
+                                <div class="eye-values">
+                                    <div>
+                                        <div class="label">S (球面)</div>
+                                        <div class="value">-2.25</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">C (円柱)</div>
+                                        <div class="value">-1.00</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">AX (軸)</div>
+                                        <div class="value">85°</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 12px;">
+                                    <div class="label">矯正視力</div>
+                                    <div class="value">1.0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                            <div class="label">瞳孔間距離 (PD)</div>
+                            <div class="value" style="font-size: 16px;">62mm</div>
+                        </div>
+                    </div>
+                    
+                    <div class="prescription-card">
+                        <div class="prescription-header">
+                            <span class="prescription-date">2023年8月22日 測定</span>
+                        </div>
+                        <div class="prescription-data">
+                            <div class="eye-data">
+                                <h6>右眼 (R)</h6>
+                                <div class="eye-values">
+                                    <div>
+                                        <div class="label">S (球面)</div>
+                                        <div class="value">-2.25</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">C (円柱)</div>
+                                        <div class="value">-0.50</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">AX (軸)</div>
+                                        <div class="value">85°</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 12px;">
+                                    <div class="label">矯正視力</div>
+                                    <div class="value">1.2</div>
+                                </div>
+                            </div>
+                            <div class="eye-data">
+                                <h6>左眼 (L)</h6>
+                                <div class="eye-values">
+                                    <div>
+                                        <div class="label">S (球面)</div>
+                                        <div class="value">-2.00</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">C (円柱)</div>
+                                        <div class="value">-0.75</div>
+                                    </div>
+                                    <div>
+                                        <div class="label">AX (軸)</div>
+                                        <div class="value">80°</div>
+                                    </div>
+                                </div>
+                                <div style="text-align: center; margin-top: 12px;">
+                                    <div class="label">矯正視力</div>
+                                    <div class="value">1.0</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0;">
+                            <div class="label">瞳孔間距離 (PD)</div>
+                            <div class="value" style="font-size: 16px;">62mm</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Purchase History Tab -->
+            <div id="purchase-history" class="tab-content">
+                <div class="purchase-table">
+                    <table class="striped">
+                        <thead>
+                            <tr>
+                                <th>購入日</th>
+                                <th>商品</th>
+                                <th>金額</th>
+                                <th>店舗</th>
+                                <th>状態</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2024-07-15</td>
+                                <td>
+                                    <strong>Ray-Ban RB5154</strong><br>
+                                    <small>遠近両用レンズ</small>
+                                </td>
+                                <td>¥45,800</td>
+                                <td>新宿本店</td>
+                                <td><span class="chip green white-text">完了</span></td>
+                            </tr>
+                            <tr>
+                                <td>2023-08-22</td>
+                                <td>
+                                    <strong>JINS Classic</strong><br>
+                                    <small>単焦点レンズ</small>
+                                </td>
+                                <td>¥28,600</td>
+                                <td>新宿本店</td>
+                                <td><span class="chip green white-text">完了</span></td>
+                            </tr>
+                            <tr>
+                                <td>2022-12-10</td>
+                                <td>
+                                    <strong>Oakley Holbrook</strong><br>
+                                    <small>サングラス（度付き）</small>
+                                </td>
+                                <td>¥52,100</td>
+                                <td>渋谷店</td>
+                                <td><span class="chip green white-text">完了</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Notes Tab -->
+            <div id="notes" class="tab-content">
+                <div class="notes-section">
+                    <div class="notes-header">
+                        <h6><i class="material-icons left">edit</i>手書きメモ</h6>
+                        <button class="btn-small waves-effect waves-light blue darken-2" onclick="saveNotes()">
+                            <i class="material-icons left">save</i>保存
+                        </button>
+                    </div>
+                    <textarea class="notes-area" placeholder="顧客に関するメモをここに記入してください...&#10;&#10;- フレームの好み&#10;- アレルギー情報&#10;- 特記事項など">2024-07-15:
+遠近両用希望。PCでの作業が多い。
+フレームは軽めを希望。
+鼻パッドにアレルギーあり（シリコン系は避ける）
+
+2023-08-22:
+初回来店時のメガネが気に入っている様子。
+同じタイプのフレームを希望。
+保証期間内でのレンズ交換を案内済み。</textarea>
+                </div>
+                
+                <div class="image-section">
+                    <div class="notes-header">
+                        <h6><i class="material-icons left">collections</i>画像管理</h6>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                        <input type="file" id="cameraInput" accept="image/*" capture="camera" style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+                    <p style="color: #666; margin-bottom: 16px;">顧客の顔写真、現在使用中の眼鏡、処方箋などの画像を保存できます</p>
+                    
+                    <div class="image-gallery">
+                        <!-- 既存の画像 -->
+                        <div class="image-item" onclick="viewImage(this)" data-image-id="img_001">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23f5f5f5'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999'%3E顔写真%3C/text%3E%3C/svg%3E" alt="顧客顔写真">
+                            <div class="image-date">2024-07-15</div>
+                        </div>
+                        
+                        <div class="image-item" onclick="viewImage(this)" data-image-id="img_002">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23f5f5f5'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999'%3E現在の眼鏡%3C/text%3E%3C/svg%3E" alt="現在使用中の眼鏡">
+                            <div class="image-date">2024-07-15</div>
+                        </div>
+                        
+                        <div class="image-item" onclick="viewImage(this)" data-image-id="img_003">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect width='150' height='150' fill='%23f5f5f5'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999'%3E処方箋%3C/text%3E%3C/svg%3E" alt="処方箋">
+                            <div class="image-date">2024-07-15</div>
+                        </div>
+                        
+                        <!-- ファイルアップロード -->
+                        <div class="image-item image-upload" onclick="document.getElementById('fileInput').click()">
+                            <i class="material-icons" style="font-size: 48px; color: #1976d2;">add_photo_alternate</i>
+                            <span style="color: #1976d2; margin-top: 8px;">画像を選択</span>
+                        </div>
+                        
+                        <!-- カメラ撮影 -->
+                        <div class="image-item image-upload" onclick="document.getElementById('cameraInput').click()">
+                            <i class="material-icons" style="font-size: 48px; color: #1976d2;">camera_alt</i>
+                            <span style="color: #1976d2; margin-top: 8px;">写真を撮る</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Floating Action Button -->
+    <div class="fixed-action-btn">
+        <a class="btn-floating btn-large green">
+            <i class="large material-icons">add</i>
+        </a>
+        <ul>
+            <li><a class="btn-floating red" onclick="newPrescription()"><i class="material-icons">visibility</i></a></li>
+            <li><a class="btn-floating blue" onclick="newOrder()"><i class="material-icons">shopping_cart</i></a></li>
+        </ul>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Initialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tabs
+            M.Tabs.init(document.querySelectorAll('.tabs'));
+            
+            // Initialize floating action button
+            M.FloatingActionButton.init(document.querySelectorAll('.fixed-action-btn'));
+        });
+        
+        function editCustomer() {
+            M.toast({html: '顧客情報編集モードに切り替えます'});
+        }
+        
+        function saveNotes() {
+            M.toast({html: 'メモを保存しました'});
+        }
+        
+        function newPrescription() {
+            M.toast({html: '新しい視力測定を開始します'});
+        }
+        
+        function newOrder() {
+            window.location.href = '/orders/new?customer=1001';
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // 実際の実装では、ここでファイルをサーバーにアップロード
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // プレビュー表示（デモ用）
+                    M.toast({html: '画像をアップロードしました: ' + file.name});
+                    
+                    // 新しい画像アイテムを追加（デモ用）
+                    const gallery = document.querySelector('.image-gallery');
+                    const uploadButtons = gallery.querySelectorAll('.image-upload');
+                    const newItem = document.createElement('div');
+                    newItem.className = 'image-item';
+                    newItem.onclick = function() { viewImage(this); };
+                    newItem.innerHTML = `
+                        <img src="${e.target.result}" alt="${file.name}">
+                        <div class="image-date">${new Date().toLocaleDateString('ja-JP')}</div>
+                    `;
+                    gallery.insertBefore(newItem, uploadButtons[0]);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        let annotationCanvas = null;
+        let currentImageData = null;
+        
+        function viewImage(element) {
+            const imgSrc = element.querySelector('img').src;
+            const imgAlt = element.querySelector('img').alt;
+            const imageId = element.getAttribute('data-image-id') || Date.now();
+            
+            currentImageData = {
+                id: imageId,
+                src: imgSrc,
+                alt: imgAlt
+            };
+            
+            // 画像注釈モーダル
+            const modal = document.createElement('div');
+            modal.className = 'modal annotation-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h4>${imgAlt}</h4>
+                    <div class="annotation-container">
+                        <div class="canvas-container">
+                            <canvas id="annotationCanvas"></canvas>
+                        </div>
+                        <div class="annotation-tools">
+                            <h6>描画ツール</h6>
+                            <button class="btn-small tool-button waves-effect waves-light" onclick="setDrawingMode('pencil')">
+                                <i class="material-icons left">edit</i>ペン
+                            </button>
+                            <button class="btn-small tool-button waves-effect waves-light" onclick="setDrawingMode('text')">
+                                <i class="material-icons left">text_fields</i>テキスト
+                            </button>
+                            <button class="btn-small tool-button waves-effect waves-light" onclick="setDrawingMode('arrow')">
+                                <i class="material-icons left">arrow_forward</i>矢印
+                            </button>
+                            <button class="btn-small tool-button waves-effect waves-light" onclick="setDrawingMode('rect')">
+                                <i class="material-icons left">crop_square</i>四角
+                            </button>
+                            
+                            <h6 style="margin-top: 16px;">色</h6>
+                            <div class="color-picker">
+                                <div class="color-option selected" style="background-color: #ff0000;" onclick="setColor('#ff0000')"></div>
+                                <div class="color-option" style="background-color: #0000ff;" onclick="setColor('#0000ff')"></div>
+                                <div class="color-option" style="background-color: #00ff00;" onclick="setColor('#00ff00')"></div>
+                                <div class="color-option" style="background-color: #ffff00;" onclick="setColor('#ffff00')"></div>
+                                <div class="color-option" style="background-color: #000000;" onclick="setColor('#000000')"></div>
+                                <div class="color-option" style="background-color: #ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff')"></div>
+                            </div>
+                            
+                            <h6 style="margin-top: 16px;">線の太さ</h6>
+                            <div class="brush-size-slider">
+                                <input type="range" min="1" max="10" value="2" onchange="setBrushSize(this.value)">
+                            </div>
+                            
+                            <button class="btn-small tool-button waves-effect waves-light red" onclick="clearAnnotations()">
+                                <i class="material-icons left">clear</i>クリア
+                            </button>
+                            <button class="btn-small tool-button waves-effect waves-light" onclick="undoAnnotation()">
+                                <i class="material-icons left">undo</i>元に戻す
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a href="#!" onclick="saveAnnotations()" class="waves-effect waves-green btn-flat">保存</a>
+                    <a href="#!" class="modal-close waves-effect waves-red btn-flat">閉じる</a>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const instance = M.Modal.init(modal, {
+                onOpenEnd: function() {
+                    initializeAnnotationCanvas(imgSrc);
+                },
+                onCloseEnd: function() {
+                    if (annotationCanvas) {
+                        annotationCanvas.dispose();
+                        annotationCanvas = null;
+                    }
+                    modal.remove();
+                }
+            });
+            instance.open();
+        }
+        
+        function initializeAnnotationCanvas(imageSrc) {
+            const canvasElement = document.getElementById('annotationCanvas');
+            annotationCanvas = new fabric.Canvas('annotationCanvas');
+            
+            fabric.Image.fromURL(imageSrc, function(img) {
+                const containerWidth = canvasElement.parentElement.offsetWidth;
+                const scale = containerWidth / img.width;
+                
+                annotationCanvas.setDimensions({
+                    width: containerWidth,
+                    height: img.height * scale
+                });
+                
+                img.scale(scale);
+                annotationCanvas.setBackgroundImage(img, annotationCanvas.renderAll.bind(annotationCanvas));
+                
+                // 保存されたアノテーションを読み込む（実際の実装では、サーバーから取得）
+                loadSavedAnnotations(currentImageData.id);
+                
+                // デフォルトは描画モード
+                setDrawingMode('pencil');
+            });
+        }
+        
+        function setDrawingMode(mode) {
+            if (!annotationCanvas) return;
+            
+            // 全ての色オプションの選択状態をリセット
+            document.querySelectorAll('.tool-button').forEach(btn => {
+                btn.classList.remove('blue', 'darken-2');
+            });
+            
+            // 現在のツールボタンをハイライト
+            event.target.closest('.tool-button').classList.add('blue', 'darken-2');
+            
+            annotationCanvas.isDrawingMode = false;
+            
+            switch(mode) {
+                case 'pencil':
+                    annotationCanvas.isDrawingMode = true;
+                    annotationCanvas.freeDrawingBrush.width = 2;
+                    annotationCanvas.freeDrawingBrush.color = '#ff0000';
+                    break;
+                case 'text':
+                    annotationCanvas.on('mouse:down', function(options) {
+                        const pointer = annotationCanvas.getPointer(options.e);
+                        const text = prompt('テキストを入力してください:');
+                        if (text) {
+                            const textObj = new fabric.Text(text, {
+                                left: pointer.x,
+                                top: pointer.y,
+                                fontSize: 20,
+                                fill: annotationCanvas.freeDrawingBrush.color
+                            });
+                            annotationCanvas.add(textObj);
+                            annotationCanvas.off('mouse:down');
+                        }
+                    });
+                    break;
+                case 'arrow':
+                    let line, isDown;
+                    annotationCanvas.on('mouse:down', function(o) {
+                        isDown = true;
+                        const pointer = annotationCanvas.getPointer(o.e);
+                        const points = [pointer.x, pointer.y, pointer.x, pointer.y];
+                        line = new fabric.Line(points, {
+                            strokeWidth: 3,
+                            fill: annotationCanvas.freeDrawingBrush.color,
+                            stroke: annotationCanvas.freeDrawingBrush.color,
+                            originX: 'center',
+                            originY: 'center'
+                        });
+                        annotationCanvas.add(line);
+                    });
+                    annotationCanvas.on('mouse:move', function(o) {
+                        if (!isDown) return;
+                        const pointer = annotationCanvas.getPointer(o.e);
+                        line.set({ x2: pointer.x, y2: pointer.y });
+                        annotationCanvas.renderAll();
+                    });
+                    annotationCanvas.on('mouse:up', function(o) {
+                        isDown = false;
+                        annotationCanvas.off('mouse:down');
+                        annotationCanvas.off('mouse:move');
+                        annotationCanvas.off('mouse:up');
+                    });
+                    break;
+                case 'rect':
+                    let rect, isDrawing = false;
+                    let startX, startY;
+                    
+                    annotationCanvas.on('mouse:down', function(o) {
+                        isDrawing = true;
+                        const pointer = annotationCanvas.getPointer(o.e);
+                        startX = pointer.x;
+                        startY = pointer.y;
+                        rect = new fabric.Rect({
+                            left: startX,
+                            top: startY,
+                            width: 0,
+                            height: 0,
+                            fill: 'transparent',
+                            stroke: annotationCanvas.freeDrawingBrush.color,
+                            strokeWidth: 2
+                        });
+                        annotationCanvas.add(rect);
+                    });
+                    
+                    annotationCanvas.on('mouse:move', function(o) {
+                        if (!isDrawing) return;
+                        const pointer = annotationCanvas.getPointer(o.e);
+                        const width = pointer.x - startX;
+                        const height = pointer.y - startY;
+                        rect.set({ width: width, height: height });
+                        annotationCanvas.renderAll();
+                    });
+                    
+                    annotationCanvas.on('mouse:up', function(o) {
+                        isDrawing = false;
+                        annotationCanvas.off('mouse:down');
+                        annotationCanvas.off('mouse:move');
+                        annotationCanvas.off('mouse:up');
+                    });
+                    break;
+            }
+        }
+        
+        function setColor(color) {
+            if (!annotationCanvas) return;
+            
+            // 色オプションの選択状態を更新
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            if (annotationCanvas.freeDrawingBrush) {
+                annotationCanvas.freeDrawingBrush.color = color;
+            }
+        }
+        
+        function setBrushSize(size) {
+            if (!annotationCanvas && annotationCanvas.freeDrawingBrush) {
+                annotationCanvas.freeDrawingBrush.width = parseInt(size);
+            }
+        }
+        
+        function clearAnnotations() {
+            if (!annotationCanvas) return;
+            
+            const objects = annotationCanvas.getObjects();
+            objects.forEach(obj => {
+                annotationCanvas.remove(obj);
+            });
+            annotationCanvas.renderAll();
+        }
+        
+        function undoAnnotation() {
+            if (!annotationCanvas) return;
+            
+            const objects = annotationCanvas.getObjects();
+            if (objects.length > 0) {
+                annotationCanvas.remove(objects[objects.length - 1]);
+                annotationCanvas.renderAll();
+            }
+        }
+        
+        function saveAnnotations() {
+            if (!annotationCanvas) return;
+            
+            // アノテーションデータをJSON形式で保存
+            const annotationData = {
+                imageId: currentImageData.id,
+                timestamp: new Date().toISOString(),
+                annotations: annotationCanvas.toJSON()
+            };
+            
+            // 実際の実装では、ここでサーバーに送信
+            console.log('Saving annotations:', annotationData);
+            M.toast({html: 'アノテーションを保存しました'});
+            
+            // ローカルストレージに保存（デモ用）
+            localStorage.setItem(`annotation_${currentImageData.id}`, JSON.stringify(annotationData));
+        }
+        
+        function loadSavedAnnotations(imageId) {
+            // 実際の実装では、サーバーから取得
+            const savedData = localStorage.getItem(`annotation_${imageId}`);
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                annotationCanvas.loadFromJSON(data.annotations, function() {
+                    annotationCanvas.renderAll();
+                });
+            }
+        }
+    </script>
+</body>
+</html>

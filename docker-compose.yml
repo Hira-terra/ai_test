@@ -1,0 +1,165 @@
+# version: '3.8'  # 廃止予定のため削除
+
+services:
+  # PostgreSQL データベース
+  postgres:
+    image: postgres:15-alpine
+    container_name: glasses_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-glasses_store_db}
+      POSTGRES_USER: ${POSTGRES_USER:-glasses_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-glasses_user} -d ${POSTGRES_DB:-glasses_store_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis キャッシュ・セッション管理
+  redis:
+    image: redis:7-alpine
+    container_name: glasses_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # バックエンド API サーバー
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: glasses_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      HOST: 0.0.0.0
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-glasses_store_db}
+      DB_USER: ${POSTGRES_USER:-glasses_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # REDIS_PASSWORD:
+      JWT_SECRET: ${JWT_SECRET:-fee476d365a8121563f73089e9e0bfb8c63478336e82157c4e7e0b7cc692873d}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-b6c64c1ba17ddf7a4000b1dc7b1bc3afc3f31fc3370ea41089cc7ffa8155f2b6}
+      SESSION_SECRET: ${SESSION_SECRET:-76d5a8b0ee2106d6d9980b90a691eb182f72da72f9ca27ff483605911dc49b57}
+      UPLOAD_DIR: /app/uploads
+      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-3000}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs/app:/app/logs
+      - ./backend:/app:cached
+      - backend_node_modules:/app/node_modules
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # フロントエンド React アプリケーション
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${NODE_ENV:-development}
+      args:
+        REACT_APP_API_BASE_URL: http://localhost:3001/api
+        REACT_APP_WS_URL: ws://localhost:3001
+        REACT_APP_USE_MOCK_API: "false"
+    container_name: glasses_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      REACT_APP_API_BASE_URL: http://localhost:3001/api
+      REACT_APP_WS_URL: ws://localhost:3001
+      REACT_APP_USE_MOCK_API: "false"
+      CHOKIDAR_USEPOLLING: true
+      WATCHPACK_POLLING: true
+    volumes:
+      - ./frontend:/app:cached
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - glasses_network
+    stdin_open: true
+    tty: true
+
+  # Nginx リバースプロキシ
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: glasses_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  glasses_network:
+    driver: bridge
+    name: ${DOCKER_NETWORK_NAME:-glasses_network}
+
+volumes:
+  postgres_data:
+    driver: local
+  
+  redis_data:
+    driver: local
+  
+  backend_node_modules:
+    driver: local
+  
+  frontend_node_modules:
+    driver: local

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>受注入力 - 眼鏡店顧客管理システム</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background-color: #1976d2;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* Progress Indicator */
+        .progress-indicator {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+        }
+        
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            right: 40px;
+            height: 2px;
+            background: #e0e0e0;
+            z-index: 1;
+        }
+        
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .step.active .step-circle {
+            background: #1976d2;
+            color: white;
+        }
+        
+        .step.completed .step-circle {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .step-label {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        
+        /* Order Form */
+        .order-form {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .form-section {
+            margin-bottom: 32px;
+        }
+        
+        .form-section h6 {
+            margin: 0 0 20px 0;
+            font-size: 18px;
+            font-weight: 500;
+            color: #333;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1976d2;
+        }
+        
+        /* Customer Info */
+        .customer-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .customer-name {
+            font-size: 20px;
+            font-weight: 500;
+            margin: 0 0 8px 0;
+        }
+        
+        .customer-details {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        /* Product Selection */
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .product-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .product-card:hover {
+            border-color: #1976d2;
+        }
+        
+        .product-card.selected {
+            border-color: #1976d2;
+            background-color: #e3f2fd;
+        }
+        
+        .product-card h6 {
+            margin: 0 0 12px 0;
+            font-weight: 500;
+        }
+        
+        .product-details {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .product-price {
+            font-size: 18px;
+            font-weight: 500;
+            color: #1976d2;
+        }
+        
+        /* Prescription Section */
+        .prescription-auto {
+            background: #e8f5e8;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .prescription-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .eye-input {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .eye-input h6 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .eye-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        
+        .eye-fields .input-field {
+            margin: 0;
+        }
+        
+        .pd-input {
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        /* Discount Section */
+        .discount-section {
+            background: #fff3e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .discount-row {
+            display: flex;
+            gap: 16px;
+            align-items: end;
+        }
+        
+        .discount-input {
+            flex: 1;
+        }
+        
+        .discount-type {
+            min-width: 120px;
+        }
+        
+        .applied-discount {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #e0f2f1;
+            border-radius: 4px;
+            color: #00695c;
+        }
+        
+        /* Payment Section */
+        .payment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        
+        .payment-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .summary-row:last-child {
+            border-bottom: none;
+            font-weight: 500;
+            font-size: 18px;
+            color: #1976d2;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+        
+        .btn-large {
+            height: 54px;
+            line-height: 54px;
+            padding: 0 32px;
+            font-size: 16px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .prescription-data {
+                grid-template-columns: 1fr;
+            }
+            
+            .payment-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .eye-fields {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="/" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    眼鏡店顧客管理システム
+                </a>
+                <ul class="right">
+                    <li><a href="#"><i class="material-icons left">store</i>新宿本店</a></li>
+                    <li><a href="#"><i class="material-icons left">person</i>田中花子</a></li>
+                    <li><a href="/logout"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Progress Indicator -->
+        <div class="progress-indicator">
+            <div class="steps">
+                <div class="step completed">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">顧客選択</div>
+                </div>
+                <div class="step active">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">商品選択</div>
+                </div>
+                <div class="step">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">度数入力</div>
+                </div>
+                <div class="step">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">お会計</div>
+                </div>
+                <div class="step">
+                    <div class="step-circle">5</div>
+                    <div class="step-label">完了</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Order Form -->
+        <div class="order-form">
+            <!-- Customer Info -->
+            <div class="form-section">
+                <h6><i class="material-icons left">person</i>ご注文者様</h6>
+                <div class="customer-info">
+                    <p class="customer-name">山田 太郎</p>
+                    <p class="customer-details">
+                        カルテ番号: C-1001 | 📞 03-1234-5678 | 最終来店: 2024-07-15
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Product Selection -->
+            <div class="form-section">
+                <h6><i class="material-icons left">shopping_cart</i>商品選択</h6>
+                <div class="product-grid">
+                    <div class="product-card selected" onclick="selectProduct('frame')">
+                        <h6>フレーム</h6>
+                        <p class="product-details">
+                            <strong>Ray-Ban RB5154</strong><br>
+                            個品番号: F-20240801-001<br>
+                            カラー: ブラック | サイズ: 52-18-140
+                        </p>
+                        <p class="product-price">¥25,800</p>
+                    </div>
+                    
+                    <div class="product-card selected" onclick="selectProduct('lens')">
+                        <h6>レンズ</h6>
+                        <p class="product-details">
+                            <strong>遠近両用レンズ</strong><br>
+                            HOYA 累進多焦点<br>
+                            コーティング: ブルーライトカット
+                        </p>
+                        <p class="product-price">¥28,600</p>
+                    </div>
+                </div>
+                
+                <!-- 補聴器カテゴリ -->
+                <h6 style="margin-top: 24px; margin-bottom: 16px;">補聴器</h6>
+                <div class="product-grid">
+                    <div class="product-card" onclick="selectProduct('hearing-aid')">
+                        <h6>補聴器</h6>
+                        <p class="product-details">
+                            <strong>デジタル補聴器 RIC型</strong><br>
+                            Phonak Audeo Paradise<br>
+                            充電式・Bluetooth対応
+                        </p>
+                        <p class="product-price">¥198,000</p>
+                    </div>
+                    
+                    <div class="product-card" onclick="selectProduct('hearing-aid-battery')">
+                        <h6>補聴器関連商品</h6>
+                        <p class="product-details">
+                            <strong>補聴器用電池セット</strong><br>
+                            PR48(13) 6個入り×10パック<br>
+                            予備電池ケース付き
+                        </p>
+                        <p class="product-price">¥3,800</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Prescription -->
+            <div class="form-section">
+                <h6><i class="material-icons left">visibility</i>度数入力</h6>
+                
+                <div class="prescription-auto">
+                    <i class="material-icons green-text">check_circle</i>
+                    <span>最新の測定データ（2024-07-15）を自動入力しました</span>
+                    <button class="btn-small blue darken-2 right" onclick="editPrescription()">編集</button>
+                </div>
+                
+                <div class="prescription-data">
+                    <div class="eye-input">
+                        <h6>右眼 (R)</h6>
+                        <div class="eye-fields">
+                            <div class="input-field">
+                                <input type="text" id="r_sph" value="-2.50" readonly>
+                                <label for="r_sph">S (球面)</label>
+                            </div>
+                            <div class="input-field">
+                                <input type="text" id="r_cyl" value="-0.75" readonly>
+                                <label for="r_cyl">C (円柱)</label>
+                            </div>
+                            <div class="input-field">
+                                <input type="text" id="r_axis" value="90" readonly>
+                                <label for="r_axis">AX (軸)</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="eye-input">
+                        <h6>左眼 (L)</h6>
+                        <div class="eye-fields">
+                            <div class="input-field">
+                                <input type="text" id="l_sph" value="-2.25" readonly>
+                                <label for="l_sph">S (球面)</label>
+                            </div>
+                            <div class="input-field">
+                                <input type="text" id="l_cyl" value="-1.00" readonly>
+                                <label for="l_cyl">C (円柱)</label>
+                            </div>
+                            <div class="input-field">
+                                <input type="text" id="l_axis" value="85" readonly>
+                                <label for="l_axis">AX (軸)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pd-input">
+                    <div class="input-field" style="max-width: 200px; margin: 0 auto;">
+                        <input type="text" id="pd" value="62" readonly>
+                        <label for="pd">瞳孔間距離 (PD) mm</label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Discount -->
+            <div class="form-section">
+                <h6><i class="material-icons left">local_offer</i>値引き設定</h6>
+                <div class="discount-section">
+                    <div class="discount-row">
+                        <div class="input-field discount-input">
+                            <input type="text" id="discountCode" placeholder="値引きコードを入力">
+                            <label for="discountCode">値引きコード</label>
+                        </div>
+                        <div class="input-field discount-type">
+                            <select id="discountType">
+                                <option value="amount">金額値引き</option>
+                                <option value="percent">％値引き</option>
+                            </select>
+                            <label>値引き種別</label>
+                        </div>
+                        <div class="input-field discount-input">
+                            <input type="number" id="discountValue" placeholder="0">
+                            <label for="discountValue">値引き額/率</label>
+                        </div>
+                        <button class="btn blue darken-2" onclick="applyDiscount()">
+                            <i class="material-icons">check</i>
+                        </button>
+                        <button class="btn grey" onclick="clearDiscount()">
+                            <i class="material-icons">clear</i>
+                        </button>
+                    </div>
+                    <div id="appliedDiscount" class="applied-discount" style="display: none;">
+                        <i class="material-icons">check_circle</i>
+                        <span id="appliedDiscountText"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment -->
+            <div class="form-section">
+                <h6><i class="material-icons left">payment</i>お会計・納期</h6>
+                <div class="payment-grid">
+                    <div>
+                        <div class="input-field">
+                            <select id="paymentType">
+                                <option value="full">全額お預かり</option>
+                                <option value="partial">一部入金</option>
+                                <option value="later">後日お支払い</option>
+                            </select>
+                            <label>お支払い方法</label>
+                        </div>
+                        
+                        <div class="input-field">
+                            <input type="number" id="paymentAmount" value="54400">
+                            <label for="paymentAmount" id="paymentAmountLabel">お預かり金額（円）</label>
+                        </div>
+                        
+                        <div class="input-field">
+                            <input type="date" id="deliveryDate" value="2024-08-15">
+                            <label for="deliveryDate">お渡し予定日</label>
+                        </div>
+                    </div>
+                    
+                    <div class="payment-summary">
+                        <h6>お会計内容</h6>
+                        <div class="summary-row">
+                            <span>フレーム代</span>
+                            <span>¥25,800</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>レンズ代</span>
+                            <span>¥28,600</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>加工費</span>
+                            <span>¥0</span>
+                        </div>
+                        <div class="summary-row" id="subtotalRow">
+                            <span>小計</span>
+                            <span id="subtotalAmount">¥54,400</span>
+                        </div>
+                        <div class="summary-row" id="discountRow" style="display: none; color: #d32f2f;">
+                            <span id="discountLabel">値引き</span>
+                            <span id="discountAmount">-¥0</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>合計金額</span>
+                            <span id="totalAmount">¥54,400</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn-large waves-effect waves-light grey" onclick="saveDraft()">
+                    <i class="material-icons left">save</i>
+                    下書き保存
+                </button>
+                <button class="btn-large waves-effect waves-light blue darken-2" onclick="processOrder()">
+                    <i class="material-icons left">check_circle</i>
+                    受注確定
+                </button>
+                <button class="btn-large waves-effect waves-light green" onclick="processOrderAndExport()">
+                    <i class="material-icons left">file_download</i>
+                    確定 & 発注データ出力
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize form elements
+            M.FormSelect.init(document.querySelectorAll('select'));
+            M.updateTextFields();
+            
+            // Calculate delivery date (10 days from today)
+            const today = new Date();
+            const deliveryDate = new Date(today.getTime() + (10 * 24 * 60 * 60 * 1000));
+            document.getElementById('deliveryDate').value = deliveryDate.toISOString().split('T')[0];
+        });
+        
+        function selectProduct(productType) {
+            console.log('Product selected:', productType);
+            // In real app, this would handle product selection logic
+        }
+        
+        function editPrescription() {
+            const inputs = ['r_sph', 'r_cyl', 'r_axis', 'l_sph', 'l_cyl', 'l_axis', 'pd'];
+            inputs.forEach(id => {
+                const input = document.getElementById(id);
+                input.readOnly = false;
+                input.classList.add('active');
+            });
+            M.toast({html: '度数データが編集可能になりました'});
+        }
+        
+        function saveDraft() {
+            M.toast({html: '下書きを保存しました'});
+        }
+        
+        function processOrder() {
+            // Show confirmation dialog
+            if (confirm('受注を確定しますか？\n\n※確定後は売上として計上されます')) {
+                M.toast({html: '受注が確定されました。売上に計上しました。'});
+                // In real app: redirect to order confirmation page
+                setTimeout(() => {
+                    window.location.href = '/orders/1001/confirmation';
+                }, 2000);
+            }
+        }
+        
+        function processOrderAndExport() {
+            if (confirm('受注確定と発注データ出力を行いますか？')) {
+                M.toast({html: '受注確定完了。発注データを出力中...'});
+                // Simulate file download
+                setTimeout(() => {
+                    const element = document.createElement('a');
+                    element.setAttribute('href', 'data:text/csv;charset=utf-8,受注データCSV出力サンプル');
+                    element.setAttribute('download', 'order_export_' + new Date().getTime() + '.csv');
+                    element.style.display = 'none';
+                    document.body.appendChild(element);
+                    element.click();
+                    document.body.removeChild(element);
+                    
+                    M.toast({html: '発注データをダウンロードしました'});
+                }, 1500);
+            }
+        }
+        
+        // Discount calculation
+        let currentDiscount = 0;
+        let currentSubtotal = 54400;
+        
+        function calculateTotal() {
+            const subtotal = currentSubtotal;
+            const total = subtotal - currentDiscount;
+            
+            document.getElementById('subtotalAmount').textContent = '¥' + subtotal.toLocaleString();
+            document.getElementById('totalAmount').textContent = '¥' + total.toLocaleString();
+            document.getElementById('paymentAmount').value = total;
+            M.updateTextFields();
+        }
+        
+        function applyDiscount() {
+            const code = document.getElementById('discountCode').value;
+            const type = document.getElementById('discountType').value;
+            const value = parseFloat(document.getElementById('discountValue').value) || 0;
+            
+            if (!code || value <= 0) {
+                M.toast({html: '値引きコードと値引き額を入力してください', classes: 'red'});
+                return;
+            }
+            
+            if (type === 'percent') {
+                if (value > 100) {
+                    M.toast({html: '値引き率は100%以下で入力してください', classes: 'red'});
+                    return;
+                }
+                currentDiscount = Math.floor(currentSubtotal * value / 100);
+                document.getElementById('appliedDiscountText').textContent = 
+                    `コード: ${code} (${value}%値引き適用中)`;
+                document.getElementById('discountLabel').textContent = `値引き (${value}%)`;
+            } else {
+                if (value > currentSubtotal) {
+                    M.toast({html: '値引き額が小計を超えています', classes: 'red'});
+                    return;
+                }
+                currentDiscount = value;
+                document.getElementById('appliedDiscountText').textContent = 
+                    `コード: ${code} (¥${value.toLocaleString()}値引き適用中)`;
+                document.getElementById('discountLabel').textContent = '値引き';
+            }
+            
+            document.getElementById('discountAmount').textContent = '-¥' + currentDiscount.toLocaleString();
+            document.getElementById('discountRow').style.display = 'flex';
+            document.getElementById('appliedDiscount').style.display = 'flex';
+            
+            calculateTotal();
+            M.toast({html: '値引きを適用しました', classes: 'green'});
+        }
+        
+        function clearDiscount() {
+            currentDiscount = 0;
+            document.getElementById('discountCode').value = '';
+            document.getElementById('discountValue').value = '';
+            document.getElementById('discountRow').style.display = 'none';
+            document.getElementById('appliedDiscount').style.display = 'none';
+            
+            calculateTotal();
+            M.updateTextFields();
+            M.toast({html: '値引きをクリアしました'});
+        }
+    </script>
+</body>
+</html>

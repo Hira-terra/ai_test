@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>眼鏡店顧客管理システム - API テスト画面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+        
+        .auth-section {
+            padding: 40px;
+            background: #f8f9ff;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        .api-section {
+            padding: 40px;
+        }
+        
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 25px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+        }
+        
+        .btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #c6f6d5;
+            color: #2f855a;
+            border: 1px solid #9ae6b4;
+        }
+        
+        .status.error {
+            background: #fed7d7;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+        
+        .api-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .api-btn {
+            padding: 12px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .api-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .api-btn:disabled {
+            border-color: #a0aec0;
+            color: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .response-area {
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+        }
+        
+        .token-display {
+            background: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 0.8em;
+            word-break: break-all;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .auth-section {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            
+            .api-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👓 眼鏡店顧客管理システム</h1>
+            <p>API動作確認・テストダッシュボード</p>
+        </div>
+        
+        <div class="content">
+            <!-- 認証セクション -->
+            <div class="auth-section">
+                <h2 class="section-title">🔐 認証</h2>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="userCode">ユーザーコード</label>
+                        <input type="text" id="userCode" name="userCode" placeholder="staff001" value="admin">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">パスワード</label>
+                        <input type="password" id="password" name="password" placeholder="パスワードを入力" value="password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="storeCode">店舗コード</label>
+                        <input type="text" id="storeCode" name="storeCode" placeholder="store001" value="main">
+                    </div>
+                    
+                    <button type="submit" class="btn" id="loginBtn">ログイン</button>
+                </form>
+                
+                <div id="loginStatus" class="status" style="display: none;"></div>
+                
+                <div id="tokenDisplay" class="token-display" style="display: none;"></div>
+                
+                <button class="btn" id="logoutBtn" style="display: none; margin-top: 15px; background: #e53e3e;" onclick="logout()">ログアウト</button>
+            </div>
+            
+            <!-- API テストセクション -->
+            <div class="api-section">
+                <h2 class="section-title">🚀 API テスト</h2>
+                
+                <div class="api-buttons">
+                    <button class="api-btn" onclick="testHealthCheck()">ヘルスチェック</button>
+                    <button class="api-btn" onclick="testCustomerList()" id="customerListBtn" disabled>顧客一覧</button>
+                    <button class="api-btn" onclick="testCreateCustomer()" id="createCustomerBtn" disabled>顧客作成</button>
+                    <button class="api-btn" onclick="testSearchCustomer()" id="searchCustomerBtn" disabled>顧客検索</button>
+                </div>
+                
+                <h3 style="margin-bottom: 15px;">📋 APIレスポンス</h3>
+                <div id="responseArea" class="response-area">
+                    ここにAPIレスポンスが表示されます...
+                    
+                    利用可能なエンドポイント:
+                    • GET /health - ヘルスチェック
+                    • GET /api/customers - 顧客一覧
+                    • POST /api/customers - 顧客作成
+                    • GET /api/customers/:id - 顧客詳細
+                    • PUT /api/customers/:id - 顧客更新
+                    • GET /api/customers/:id/prescriptions - 処方箋一覧
+                    • POST /api/customers/:id/prescriptions - 処方箋作成
+                    • GET /api/customers/:id/images - 画像一覧
+                    • POST /api/customers/:id/images - 画像アップロード
+                    • GET /api/customers/:id/memos - メモ一覧
+                    • POST /api/customers/:id/memos - メモ作成
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accessToken = '';
+        let currentUser = null;
+
+        // ログインフォーム処理
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userCode = document.getElementById('userCode').value;
+            const password = document.getElementById('password').value;
+            const storeCode = document.getElementById('storeCode').value;
+            
+            const loginBtn = document.getElementById('loginBtn');
+            const loginStatus = document.getElementById('loginStatus');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'ログイン中...';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userCode,
+                        password,
+                        storeCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    accessToken = data.data.accessToken;
+                    currentUser = data.data.user;
+                    
+                    loginStatus.className = 'status success';
+                    loginStatus.textContent = `✅ ログイン成功！ ユーザー: ${currentUser.name}`;
+                    loginStatus.style.display = 'block';
+                    
+                    // トークン表示
+                    document.getElementById('tokenDisplay').textContent = 
+                        `Access Token: ${accessToken.substring(0, 50)}...`;
+                    document.getElementById('tokenDisplay').style.display = 'block';
+                    
+                    // ログアウトボタン表示
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    
+                    // APIボタン有効化
+                    enableApiButtons();
+                    
+                } else {
+                    loginStatus.className = 'status error';
+                    loginStatus.textContent = `❌ ${data.error?.message || 'ログインに失敗しました'}`;
+                    loginStatus.style.display = 'block';
+                }
+                
+            } catch (error) {
+                loginStatus.className = 'status error';
+                loginStatus.textContent = `❌ 接続エラー: ${error.message}`;
+                loginStatus.style.display = 'block';
+            }
+            
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'ログイン';
+        });
+
+        // APIボタンの有効化
+        function enableApiButtons() {
+            document.getElementById('customerListBtn').disabled = false;
+            document.getElementById('createCustomerBtn').disabled = false;
+            document.getElementById('searchCustomerBtn').disabled = false;
+        }
+
+        // APIボタンの無効化
+        function disableApiButtons() {
+            document.getElementById('customerListBtn').disabled = true;
+            document.getElementById('createCustomerBtn').disabled = true;
+            document.getElementById('searchCustomerBtn').disabled = true;
+        }
+
+        // ログアウト
+        function logout() {
+            accessToken = '';
+            currentUser = null;
+            
+            document.getElementById('loginStatus').style.display = 'none';
+            document.getElementById('tokenDisplay').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'none';
+            
+            disableApiButtons();
+            
+            document.getElementById('responseArea').textContent = 'ログアウトしました。';
+        }
+
+        // レスポンス表示用関数
+        function displayResponse(title, data) {
+            const responseArea = document.getElementById('responseArea');
+            responseArea.textContent = `=== ${title} ===\n\n${JSON.stringify(data, null, 2)}`;
+        }
+
+        // ヘルスチェック
+        async function testHealthCheck() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                displayResponse('ヘルスチェック', data);
+            } catch (error) {
+                displayResponse('ヘルスチェックエラー', { error: error.message });
+            }
+        }
+
+        // 顧客一覧取得
+        async function testCustomerList() {
+            try {
+                const response = await fetch('/api/customers', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                const data = await response.json();
+                displayResponse('顧客一覧', data);
+            } catch (error) {
+                displayResponse('顧客一覧取得エラー', { error: error.message });
+            }
+        }
+
+        // 顧客作成テスト
+        async function testCreateCustomer() {
+            const testCustomer = {
+                lastName: '田中',
+                firstName: '太郎',
+                lastNameKana: 'タナカ',
+                firstNameKana: 'タロウ',
+                gender: 'male',
+                birthDate: '1985-03-15',
+                phone: '03-1234-5678',
+                email: 'tanaka@example.com',
+                address: '東京都渋谷区1-1-1',
+                notes: 'テスト顧客データ'
+            };
+
+            try {
+                const response = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify(testCustomer)
+                });
+                const data = await response.json();
+                displayResponse('顧客作成', data);
+            } catch (error) {
+                displayResponse('顧客作成エラー', { error: error.message });
+            }
+        }
+
+        // 顧客検索テスト
+        async function testSearchCustomer() {
+            try {
+                const response = await fetch('/api/customers?search=田中&limit=5', {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                });
+                const data = await response.json();
+                displayResponse('顧客検索', data);
+            } catch (error) {
+                displayResponse('顧客検索エラー', { error: error.message });
+            }
+        }
+
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            displayResponse('システム起動', {
+                status: 'ready',
+                message: '眼鏡店顧客管理システムAPIテスト画面が準備完了',
+                timestamp: new Date().toISOString(),
+                note: 'まずログインしてからAPIテストを実行してください'
+            });
+        });
+    </script>
+</body>
+</html>

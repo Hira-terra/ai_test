@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ai-POS - 顧客詳細</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        .header .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #218838;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        
+        .breadcrumb {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        .customer-detail {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .detail-header {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .detail-header h2 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .detail-header .customer-code {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .detail-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            padding: 2rem;
+        }
+        
+        .detail-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .detail-section h3 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .detail-item {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 1rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f1f1;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .detail-value {
+            color: #333;
+        }
+        
+        .visit-history {
+            grid-column: 1 / -1;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .visit-history h3 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        .history-table th,
+        .history-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .history-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .history-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+            border-left: 4px solid #c33;
+        }
+        
+        @media (max-width: 768px) {
+            .detail-content {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .detail-item {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .history-table {
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Ai-POS - 顧客詳細</h1>
+        <div class="actions">
+            <span id="userDisplay">テストユーザー</span>
+            <a href="/customer-search.html" class="btn btn-secondary">検索に戻る</a>
+            <button id="editBtn" class="btn btn-primary">編集</button>
+            <button id="deleteBtn" class="btn btn-danger">削除</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb">
+            <a href="/customer-search.html">顧客検索</a> > 顧客詳細
+        </div>
+
+        <div id="loadingMessage" class="loading">
+            顧客情報を読み込み中...
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;">
+            エラーが発生しました
+        </div>
+
+        <div id="customerDetail" class="customer-detail" style="display: none;">
+            <div class="detail-header">
+                <h2 id="customerName">顧客名</h2>
+                <div class="customer-code" id="customerCode">顧客コード</div>
+            </div>
+
+            <div class="detail-content">
+                <div class="detail-section">
+                    <h3>基本情報</h3>
+                    <div class="detail-item">
+                        <div class="detail-label">氏名</div>
+                        <div class="detail-value" id="fullName">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">フリガナ</div>
+                        <div class="detail-value" id="fullNameKana">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">性別</div>
+                        <div class="detail-value" id="gender">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">生年月日</div>
+                        <div class="detail-value" id="birthDate">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">電話番号</div>
+                        <div class="detail-value" id="phone">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">携帯番号</div>
+                        <div class="detail-value" id="mobile">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">メール</div>
+                        <div class="detail-value" id="email">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">郵便番号</div>
+                        <div class="detail-value" id="postalCode">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">住所</div>
+                        <div class="detail-value" id="address">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">メモ</div>
+                        <div class="detail-value" id="notes">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">所属店舗</div>
+                        <div class="detail-value" id="storeName">-</div>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>来店履歴</h3>
+                    <div class="detail-item">
+                        <div class="detail-label">総来店回数</div>
+                        <div class="detail-value" id="visitCount">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">最終来店日</div>
+                        <div class="detail-value" id="lastVisitDate">-</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">総購入金額</div>
+                        <div class="detail-value" id="totalPurchaseAmount">-</div>
+                    </div>
+                </div>
+
+                <div class="visit-history">
+                    <h3>来店履歴詳細</h3>
+                    <div id="historyContent">
+                        <p>来店履歴の詳細情報は今後実装予定です。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // URL パラメータから顧客IDを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const customerId = urlParams.get('id');
+
+        // 顧客詳細情報を取得
+        async function loadCustomerDetail() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const customerDetail = document.getElementById('customerDetail');
+
+            if (!customerId) {
+                showError('顧客IDが指定されていません');
+                return;
+            }
+
+            try {
+                // 認証情報の確認
+                const token = localStorage.getItem('authToken');
+                const userInfo = localStorage.getItem('userInfo');
+                
+                if (userInfo) {
+                    const user = JSON.parse(userInfo);
+                    document.getElementById('userDisplay').textContent = `${user.name} (${user.store.name})`;
+                }
+
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`http://localhost:3001/api/customers/${customerId}`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    displayCustomerDetail(data.data);
+                    loadingMessage.style.display = 'none';
+                    customerDetail.style.display = 'block';
+                } else {
+                    throw new Error(data.error?.message || '顧客情報の取得に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('顧客詳細取得エラー:', error);
+                showError(`顧客情報の取得に失敗しました: ${error.message}`);
+            }
+        }
+
+        // 顧客詳細情報を表示
+        function displayCustomerDetail(customer) {
+            // 削除ボタンで使用するためにグローバルに保存
+            window.currentCustomer = customer;
+            
+            document.getElementById('customerName').textContent = customer.fullName || '-';
+            document.getElementById('customerCode').textContent = customer.customerCode || '-';
+            document.getElementById('fullName').textContent = customer.fullName || '-';
+            document.getElementById('fullNameKana').textContent = customer.fullNameKana || '-';
+            
+            // 性別の表示
+            const genderText = customer.gender ? 
+                (customer.gender === 'male' ? '男性' : 
+                 customer.gender === 'female' ? '女性' : 
+                 customer.gender === 'other' ? 'その他' : '-') : '-';
+            document.getElementById('gender').textContent = genderText;
+            
+            // 生年月日の表示
+            if (customer.birthDate) {
+                const date = new Date(customer.birthDate);
+                document.getElementById('birthDate').textContent = date.toLocaleDateString('ja-JP');
+            } else {
+                document.getElementById('birthDate').textContent = '-';
+            }
+            
+            document.getElementById('phone').textContent = customer.phone || '-';
+            document.getElementById('mobile').textContent = customer.mobile || '-';
+            document.getElementById('email').textContent = customer.email || '-';
+            document.getElementById('postalCode').textContent = customer.postalCode || '-';
+            document.getElementById('address').textContent = customer.address || '-';
+            document.getElementById('notes').textContent = customer.notes || '-';
+            document.getElementById('storeName').textContent = customer.store?.name || '-';
+            document.getElementById('visitCount').textContent = `${customer.visitCount || 0} 回`;
+            
+            // 最終来店日の表示
+            if (customer.lastVisitDate) {
+                const date = new Date(customer.lastVisitDate);
+                document.getElementById('lastVisitDate').textContent = date.toLocaleDateString('ja-JP');
+            } else {
+                document.getElementById('lastVisitDate').textContent = '-';
+            }
+            
+            // 総購入金額の表示
+            if (customer.totalPurchaseAmount) {
+                const amount = typeof customer.totalPurchaseAmount === 'string' 
+                    ? parseFloat(customer.totalPurchaseAmount)
+                    : customer.totalPurchaseAmount;
+                document.getElementById('totalPurchaseAmount').textContent = `¥${amount.toLocaleString()}`;
+            } else {
+                document.getElementById('totalPurchaseAmount').textContent = '¥0';
+            }
+        }
+
+        // エラー表示
+        function showError(message) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('customerDetail').style.display = 'none';
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+
+        // 編集ボタンのイベント
+        document.getElementById('editBtn').addEventListener('click', () => {
+            window.location.href = `/customer-form.html?id=${customerId}`;
+        });
+
+        // 削除ボタンのイベント
+        document.getElementById('deleteBtn').addEventListener('click', async () => {
+            const customer = window.currentCustomer;
+            if (!customer) {
+                alert('顧客情報の読み込みが完了していません');
+                return;
+            }
+
+            // 確認アラート
+            const confirmMessage = `以下の顧客を削除してもよろしいですか？\n\n` +
+                `顧客コード: ${customer.customerCode}\n` +
+                `氏名: ${customer.fullName}\n` +
+                `店舗: ${customer.store?.name || '不明'}\n\n` +
+                `※この操作は取り消せません`;
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            // 二重確認
+            if (!confirm('本当に削除しますか？\nこの操作は取り消せません！')) {
+                return;
+            }
+
+            try {
+                const deleteBtn = document.getElementById('deleteBtn');
+                deleteBtn.disabled = true;
+                deleteBtn.textContent = '削除中...';
+
+                const token = localStorage.getItem('authToken');
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`http://localhost:3001/api/customers/${customerId}`, {
+                    method: 'DELETE',
+                    headers: headers
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert(`削除完了: ${data.message}`);
+                    window.location.href = '/customer-search.html';
+                } else {
+                    throw new Error(data.error?.message || '削除に失敗しました');
+                }
+
+            } catch (error) {
+                console.error('削除エラー:', error);
+                alert(`削除に失敗しました: ${error.message}`);
+                
+                // ボタンを元に戻す
+                const deleteBtn = document.getElementById('deleteBtn');
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = '削除';
+            }
+        });
+
+        // ページ読み込み時に顧客詳細を取得
+        document.addEventListener('DOMContentLoaded', loadCustomerDetail);
+    </script>
+</body>
+</html>

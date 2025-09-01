@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ai-POS - 顧客検索 v1.1</title>
+    <!-- Updated: 2025-08-18 18:10 JST -->
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .nav-wrapper {
+            padding: 0 24px;
+        }
+        
+        .brand-logo {
+            font-size: 20px;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 80px 24px 24px 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* Search Section */
+        .search-section {
+            background: white;
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .search-section h5 {
+            margin: 0 0 24px 0;
+            font-size: 24px;
+            font-weight: 400;
+            text-align: center;
+            color: #333;
+        }
+        
+        .search-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .search-input {
+            position: relative;
+            margin-bottom: 24px;
+        }
+        
+        .search-input .input-field {
+            margin: 0;
+            position: relative;
+        }
+        
+        .search-input .input-field input {
+            font-size: 18px;
+            height: 60px;
+            padding-left: 60px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin: 0;
+            box-shadow: none;
+            background-color: white;
+        }
+        
+        .search-input .input-field input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 1px #667eea;
+            outline: none;
+        }
+        
+        .search-input .input-field .prefix {
+            position: absolute;
+            left: 20px;
+            top: 18px;
+            font-size: 24px;
+            color: #666;
+            z-index: 2;
+        }
+        
+        .search-options {
+            margin-top: 24px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .search-options .option-group {
+            margin-bottom: 16px;
+        }
+        
+        .search-options .option-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .search-options .option-title {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .search-options .option-row {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        
+        .search-options label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            margin: 0;
+            font-size: 14px;
+        }
+        
+        .search-options input[type="radio"],
+        .search-options input[type="checkbox"] {
+            margin-right: 8px;
+            position: relative;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .search-options input[type="radio"]:not(:checked),
+        .search-options input[type="checkbox"]:not(:checked) {
+            position: relative;
+            opacity: 1;
+        }
+        
+        .search-btn {
+            width: 200px;
+            height: 48px;
+            font-size: 16px;
+            text-transform: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin-top: 24px;
+            border: none;
+            border-radius: 6px;
+        }
+        
+        .search-btn:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+        
+        /* 詳細検索フィールド */
+        .additional-search {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .additional-search .input-field {
+            margin-bottom: 0;
+        }
+        
+        .additional-search .input-field input {
+            height: 40px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0 16px;
+            margin: 0;
+        }
+        
+        /* Results Section */
+        .results-section {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+        
+        .results-container {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        
+        .results-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .results-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .results-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .results-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .results-count {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .customer-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .customer-card:hover {
+            background-color: #f8f9fa;
+            border-color: #667eea;
+        }
+        
+        .customer-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .customer-basic {
+            flex: 1;
+        }
+        
+        .customer-name {
+            font-size: 18px;
+            font-weight: 500;
+            margin: 0 0 8px 0;
+        }
+        
+        .customer-details {
+            color: #666;
+            font-size: 14px;
+            margin: 4px 0;
+        }
+        
+        .customer-stats {
+            text-align: right;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .last-visit {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+        }
+        
+        .btn-floating.btn-large {
+            width: 64px;
+            height: 64px;
+            background: #28a745;
+        }
+        
+        .btn-floating.btn-large i {
+            line-height: 64px;
+        }
+        
+        /* Loading */
+        .loading-section {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* No Results */
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            display: none;
+        }
+        
+        /* Error Message */
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        /* Tablet optimizations */
+        @media (max-width: 992px) {
+            .customer-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            .customer-stats {
+                text-align: left;
+            }
+            
+            .search-options .option-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="#" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    Ai-POS
+                </a>
+                <ul class="right">
+                    <li><a href="#" id="storeDisplay"><i class="material-icons left">store</i>店舗名</a></li>
+                    <li><a href="#" id="userDisplay"><i class="material-icons left">person</i>ユーザー名</a></li>
+                    <li><a href="#" onclick="logout()"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Search Section -->
+        <div class="search-section">
+            <h5>顧客検索</h5>
+            <div class="search-form">
+                <!-- Main Search Input -->
+                <div class="search-input">
+                    <div class="input-field">
+                        <i class="material-icons prefix">search</i>
+                        <input type="text" id="searchQuery" placeholder="お名前・フリガナ、電話番号、顧客コードで検索">
+                    </div>
+                </div>
+                
+                <!-- Additional Search Fields -->
+                <div class="additional-search" id="additionalSearch">
+                    <div class="row" style="margin-bottom: 0;">
+                        <div class="input-field col s6">
+                            <input type="text" id="phoneQuery" placeholder="電話番号">
+                            <label for="phoneQuery">電話番号</label>
+                        </div>
+                        <div class="input-field col s6">
+                            <input type="text" id="addressQuery" placeholder="住所（一部）">
+                            <label for="addressQuery">住所</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="search-options">
+                    <div class="option-group">
+                        <span class="option-title">検索方法</span>
+                        <div class="option-row">
+                            <label>
+                                <input type="radio" name="searchType" value="simple" checked />
+                                <span>簡単検索</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="searchType" value="detailed" />
+                                <span>詳細検索（AND条件）</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="option-group">
+                        <span class="option-title">検索範囲</span>
+                        <div class="option-row">
+                            <label>
+                                <input type="checkbox" id="searchMyStore" checked />
+                                <span id="myStoreLabel">自店舗のみ</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="searchAllStores" />
+                                <span>全店舗</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="btn search-btn waves-effect waves-light" id="searchBtn">
+                        <i class="material-icons left">search</i>
+                        検索
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Error Message -->
+        <div class="error-message" id="errorMessage"></div>
+        
+        <!-- Loading Section -->
+        <div class="loading-section" id="loadingSection">
+            <div class="loading-spinner"></div>
+            <p>検索中...</p>
+        </div>
+        
+        <!-- No Results -->
+        <div class="no-results" id="noResults">
+            <h5>該当する顧客が見つかりませんでした</h5>
+            <p>検索条件を変更してお試しください</p>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <h6>検索結果</h6>
+                <span class="results-count" id="resultsCount">0件</span>
+            </div>
+            
+            <div class="results-container">
+                <div id="customerList">
+                    <!-- Customer Cards will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a class="btn-floating btn-large waves-effect waves-light" onclick="addNewCustomer()">
+            <i class="material-icons">person_add</i>
+        </a>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Global variables
+        let currentUser = null;
+        
+        // Initialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Materialize components
+            M.AutoInit();
+            
+            loadUserInfo();
+            document.getElementById('searchQuery').focus();
+        });
+        
+        // Load user information
+        function loadUserInfo() {
+            const userInfo = localStorage.getItem('user');
+            const token = localStorage.getItem('accessToken');
+            
+            if (!userInfo || !token) {
+                console.log('認証情報がありません。ログイン画面にリダイレクトします。');
+                window.location.href = '/static/ai-pos-login.html';
+                return;
+            }
+            
+            try {
+                currentUser = JSON.parse(userInfo);
+                
+                if (!currentUser || !currentUser.store) {
+                    console.error('ユーザー情報が不完全です:', currentUser);
+                    window.location.href = '/static/ai-pos-login.html';
+                    return;
+                }
+                
+                document.getElementById('userDisplay').innerHTML = 
+                    `<i class="material-icons left">person</i>${currentUser.name || 'ユーザー'}`;
+                document.getElementById('storeDisplay').innerHTML = 
+                    `<i class="material-icons left">store</i>${currentUser.store.name || '店舗'}`;
+                document.getElementById('myStoreLabel').textContent = 
+                    `自店舗のみ (${currentUser.store.name || '店舗'})`;
+                    
+                console.log('ユーザー情報読み込み完了:', currentUser);
+            } catch (error) {
+                console.error('ユーザー情報の読み込みに失敗:', error);
+                localStorage.clear(); // ローカルストレージをクリア
+                window.location.href = '/static/ai-pos-login.html';
+            }
+        }
+        
+        // Search type handling
+        document.querySelectorAll('input[name="searchType"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const additionalSearch = document.getElementById('additionalSearch');
+                const mainSearchInput = document.getElementById('searchQuery');
+                
+                if (this.value === 'detailed') {
+                    additionalSearch.style.display = 'block';
+                    mainSearchInput.placeholder = 'お名前・フリガナ';
+                } else {
+                    additionalSearch.style.display = 'none';
+                    mainSearchInput.placeholder = 'お名前・フリガナ、電話番号、顧客コードで検索';
+                    // Clear additional fields
+                    document.getElementById('phoneQuery').value = '';
+                    document.getElementById('addressQuery').value = '';
+                }
+            });
+        });
+        
+        // Search scope handling
+        document.getElementById('searchMyStore').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('searchAllStores').checked = false;
+            }
+        });
+        
+        document.getElementById('searchAllStores').addEventListener('change', function() {
+            if (this.checked) {
+                document.getElementById('searchMyStore').checked = false;
+            }
+        });
+        
+        // Search functionality
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+        
+        // Auto-hide results when search query changes
+        document.getElementById('searchQuery').addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                hideAllSections();
+            }
+        });
+        
+        async function performSearch() {
+            const searchType = document.querySelector('input[name="searchType"]:checked').value;
+            const mainQuery = document.getElementById('searchQuery').value.trim();
+            const phoneQuery = document.getElementById('phoneQuery').value.trim();
+            const addressQuery = document.getElementById('addressQuery').value.trim();
+            const searchMyStore = document.getElementById('searchMyStore').checked;
+            const searchAllStores = document.getElementById('searchAllStores').checked;
+            
+            console.log('検索開始:', { searchType, mainQuery, phoneQuery, addressQuery, searchMyStore, searchAllStores });
+            
+            // Validation
+            if (searchType === 'simple') {
+                if (!mainQuery) {
+                    M.toast({html: '検索キーワードを入力してください'});
+                    return;
+                }
+            } else {
+                if (!mainQuery && !phoneQuery && !addressQuery) {
+                    M.toast({html: '検索条件を1つ以上入力してください'});
+                    return;
+                }
+            }
+            
+            if (!searchMyStore && !searchAllStores) {
+                M.toast({html: '検索範囲を選択してください'});
+                return;
+            }
+            
+            // Show loading
+            showLoading();
+            
+            try {
+                // Build search parameters
+                let searchParams = new URLSearchParams();
+                
+                if (searchType === 'simple') {
+                    searchParams.append('search', mainQuery);
+                } else {
+                    if (mainQuery) searchParams.append('search', mainQuery);
+                    if (phoneQuery) searchParams.append('phone', phoneQuery);
+                    if (addressQuery) searchParams.append('address', addressQuery);
+                }
+                
+                // Store filtering
+                if (searchMyStore && currentUser) {
+                    searchParams.append('ownStoreOnly', 'true');
+                } else {
+                    searchParams.append('ownStoreOnly', 'false');
+                }
+                
+                const url = `http://localhost:3001/api/customers?${searchParams.toString()}`;
+                console.log('API URL:', url);
+                
+                // Make API call
+                const token = localStorage.getItem('accessToken');
+                console.log('使用するトークン:', token ? `${token.substring(0, 50)}...` : 'null');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok && data.success) {
+                    displaySearchResults(data.data);
+                    
+                    // Show success toast
+                    const scope = searchAllStores ? '全店舗' : (currentUser?.store?.name || '自店舗');
+                    const searchInfo = searchType === 'detailed' 
+                        ? `詳細検索完了`
+                        : `${scope}から検索完了`;
+                    M.toast({html: searchInfo});
+                } else {
+                    console.error('API Error:', data);
+                    showError(data.error?.message || '検索に失敗しました');
+                }
+                
+            } catch (error) {
+                console.error('検索エラー:', error);
+                console.error('エラー詳細:', {
+                    message: error.message,
+                    stack: error.stack,
+                    type: error.name
+                });
+                
+                // より詳細なエラーメッセージ
+                let errorMessage = 'サーバーに接続できません。';
+                if (error.name === 'NetworkError' || error.message.includes('Failed to fetch')) {
+                    errorMessage += 'ネットワーク接続を確認してください。';
+                } else if (error.message.includes('CORS')) {
+                    errorMessage = 'CORS エラーが発生しました。サーバー設定を確認してください。';
+                } else {
+                    errorMessage += error.message || 'ネットワーク接続を確認してください。';
+                }
+                
+                showError(errorMessage);
+            } finally {
+                hideLoading();
+            }
+        }
+        
+        function displaySearchResults(customers) {
+            const customerList = document.getElementById('customerList');
+            const resultsCount = document.getElementById('resultsCount');
+            
+            console.log('検索結果を表示:', customers);
+            
+            if (customers.length === 0) {
+                showNoResults();
+                return;
+            }
+            
+            // Update results count
+            resultsCount.textContent = `${customers.length}件見つかりました`;
+            
+            // Clear previous results
+            customerList.innerHTML = '';
+            
+            // Create customer cards
+            customers.forEach(customer => {
+                const card = createCustomerCard(customer);
+                customerList.appendChild(card);
+            });
+            
+            // Show results
+            showResults();
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+        }
+        
+        function createCustomerCard(customer) {
+            const card = document.createElement('div');
+            card.className = 'customer-card';
+            card.onclick = () => goToCustomerDetail(customer.id || customer.customerCode);
+            
+            const age = customer.birthDate ? calculateAge(customer.birthDate) : '不明';
+            const lastVisit = customer.lastVisitDate ? 
+                new Date(customer.lastVisitDate).toLocaleDateString('ja-JP') : '来店なし';
+            const totalAmount = customer.totalPurchaseAmount ? 
+                `¥${parseFloat(customer.totalPurchaseAmount).toLocaleString()}` : '¥0';
+            const visitCount = customer.visitCount || 0;
+            
+            // Full name construction
+            const fullName = `${customer.lastName || ''} ${customer.firstName || ''}`.trim() || customer.fullName || '-';
+            
+            card.innerHTML = `
+                <div class="customer-info">
+                    <div class="customer-basic">
+                        <p class="customer-name">${fullName}</p>
+                        <p class="customer-details">📞 ${customer.phone || '-'}</p>
+                        <p class="customer-details">🎂 ${customer.birthDate || '-'} (${age}歳)</p>
+                        <p class="customer-details">🏪 ${currentUser.store.name}</p>
+                        <p class="customer-details">顧客コード: ${customer.customerCode || customer.id || '-'}</p>
+                    </div>
+                    <div class="customer-stats">
+                        <p class="last-visit">最終来店: ${lastVisit}</p>
+                        <p>来店回数: ${visitCount}回</p>
+                        <p>累計購入額: ${totalAmount}</p>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        function calculateAge(dateOfBirth) {
+            const today = new Date();
+            const birthDate = new Date(dateOfBirth);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            
+            return age;
+        }
+        
+        function showLoading() {
+            hideAllSections();
+            document.getElementById('loadingSection').style.display = 'block';
+            
+            const searchBtn = document.getElementById('searchBtn');
+            searchBtn.innerHTML = '<i class="material-icons left">refresh</i>検索中...';
+            searchBtn.disabled = true;
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingSection').style.display = 'none';
+            
+            const searchBtn = document.getElementById('searchBtn');
+            searchBtn.innerHTML = '<i class="material-icons left">search</i>検索';
+            searchBtn.disabled = false;
+        }
+        
+        function showResults() {
+            hideAllSections();
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+        
+        function showNoResults() {
+            hideAllSections();
+            document.getElementById('noResults').style.display = 'block';
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            M.toast({html: message, classes: 'red'});
+            
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        function hideAllSections() {
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('noResults').style.display = 'none';
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+        
+        function goToCustomerDetail(customerId) {
+            if (!customerId) {
+                M.toast({html: '顧客情報が見つかりません'});
+                return;
+            }
+            window.location.href = `/static/customer-detail.html?id=${customerId}`;
+        }
+        
+        function addNewCustomer() {
+            window.location.href = '/static/customer-form.html';
+        }
+        
+        function logout() {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
+            window.location.href = '/static/ai-pos-login.html';
+        }
+    </script>
+</body>
+</html>

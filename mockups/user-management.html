@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ユーザー管理 - 眼鏡店顧客管理システム</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background-color: #1976d2;
+        }
+        
+        /* Main Content */
+        .main-container {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Page Header */
+        .page-header {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .page-title h4 {
+            margin: 0;
+            font-weight: 500;
+        }
+        
+        .page-subtitle {
+            color: #666;
+            margin: 4px 0 0 0;
+        }
+        
+        /* Search and Filter */
+        .search-filter {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 16px;
+            align-items: end;
+        }
+        
+        .search-input {
+            flex: 1;
+        }
+        
+        .filter-select {
+            min-width: 180px;
+        }
+        
+        /* User Table */
+        .user-table {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .user-table table {
+            margin: 0;
+        }
+        
+        .user-table th {
+            background-color: #f5f5f5;
+            font-weight: 500;
+            padding: 16px;
+        }
+        
+        .user-table td {
+            padding: 16px;
+            vertical-align: middle;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e3f2fd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1976d2;
+            font-weight: 500;
+        }
+        
+        .user-details h6 {
+            margin: 0 0 4px 0;
+            font-weight: 500;
+        }
+        
+        .user-id {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .role-chip {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+        
+        .role-hq {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .role-manager {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+        
+        .role-staff {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-chip {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-active {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        
+        .status-inactive {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            max-width: 600px;
+        }
+        
+        .modal-content {
+            padding: 24px;
+        }
+        
+        .modal-footer {
+            padding: 16px 24px;
+        }
+        
+        .form-section {
+            margin-bottom: 24px;
+        }
+        
+        .form-section h6 {
+            margin: 0 0 16px 0;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .page-header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .filter-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .user-table {
+                overflow-x: auto;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="/hq/dashboard" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    眼鏡店顧客管理システム
+                </a>
+                <ul class="right">
+                    <li><a href="#"><i class="material-icons left">store</i>本部</a></li>
+                    <li><a href="#"><i class="material-icons left">person</i>山田太郎</a></li>
+                    <li><a href="/logout"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-title">
+                <h4>ユーザー管理</h4>
+                <p class="page-subtitle">全店舗のスタッフアカウント管理</p>
+            </div>
+            <div>
+                <button class="btn waves-effect waves-light green" onclick="openAddUserModal()">
+                    <i class="material-icons left">person_add</i>
+                    新規ユーザー追加
+                </button>
+            </div>
+        </div>
+        
+        <!-- Search and Filter -->
+        <div class="search-filter">
+            <div class="filter-row">
+                <div class="input-field search-input">
+                    <i class="material-icons prefix">search</i>
+                    <input type="text" id="userSearch" placeholder="氏名、ユーザーIDで検索">
+                </div>
+                
+                <div class="input-field filter-select">
+                    <select id="storeFilter">
+                        <option value="">全店舗</option>
+                        <option value="1">新宿本店</option>
+                        <option value="2">渋谷店</option>
+                        <option value="3">池袋店</option>
+                        <option value="4">銀座店</option>
+                        <option value="5">横浜店</option>
+                    </select>
+                    <label>店舗</label>
+                </div>
+                
+                <div class="input-field filter-select">
+                    <select id="roleFilter">
+                        <option value="">全権限</option>
+                        <option value="hq">本部スタッフ</option>
+                        <option value="manager">店長</option>
+                        <option value="staff">スタッフ</option>
+                    </select>
+                    <label>権限</label>
+                </div>
+                
+                <div class="input-field filter-select">
+                    <select id="statusFilter">
+                        <option value="">全ステータス</option>
+                        <option value="active">アクティブ</option>
+                        <option value="inactive">非アクティブ</option>
+                    </select>
+                    <label>ステータス</label>
+                </div>
+                
+                <button class="btn waves-effect waves-light blue darken-2" onclick="searchUsers()">
+                    <i class="material-icons">search</i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- User Table -->
+        <div class="user-table">
+            <table class="striped">
+                <thead>
+                    <tr>
+                        <th>ユーザー</th>
+                        <th>所属店舗</th>
+                        <th>権限</th>
+                        <th>最終ログイン</th>
+                        <th>ステータス</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">山</div>
+                                <div class="user-details">
+                                    <h6>山田 太郎</h6>
+                                    <p class="user-id">ID: hq_yamada</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>本部</td>
+                        <td><span class="role-chip role-hq">本部スタッフ</span></td>
+                        <td>2024-08-05 09:30</td>
+                        <td><span class="status-chip status-active">アクティブ</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small blue darken-2 waves-effect" onclick="editUser('hq_yamada')">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <button class="btn-small red waves-effect" onclick="deactivateUser('hq_yamada')">
+                                    <i class="material-icons">block</i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">田</div>
+                                <div class="user-details">
+                                    <h6>田中 花子</h6>
+                                    <p class="user-id">ID: mgr_tanaka_shinjuku</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>新宿本店</td>
+                        <td><span class="role-chip role-manager">店長</span></td>
+                        <td>2024-08-05 08:45</td>
+                        <td><span class="status-chip status-active">アクティブ</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small blue darken-2 waves-effect" onclick="editUser('mgr_tanaka_shinjuku')">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <button class="btn-small orange waves-effect" onclick="resetPassword('mgr_tanaka_shinjuku')">
+                                    <i class="material-icons">lock_reset</i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">佐</div>
+                                <div class="user-details">
+                                    <h6>佐藤 次郎</h6>
+                                    <p class="user-id">ID: staff_sato_shinjuku</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>新宿本店</td>
+                        <td><span class="role-chip role-staff">スタッフ</span></td>
+                        <td>2024-08-04 18:20</td>
+                        <td><span class="status-chip status-active">アクティブ</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small blue darken-2 waves-effect" onclick="editUser('staff_sato_shinjuku')">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <button class="btn-small orange waves-effect" onclick="resetPassword('staff_sato_shinjuku')">
+                                    <i class="material-icons">lock_reset</i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">高</div>
+                                <div class="user-details">
+                                    <h6>高橋 美咲</h6>
+                                    <p class="user-id">ID: staff_takahashi_shibuya</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>渋谷店</td>
+                        <td><span class="role-chip role-staff">スタッフ</span></td>
+                        <td>2024-07-30 17:45</td>
+                        <td><span class="status-chip status-inactive">非アクティブ</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small green waves-effect" onclick="activateUser('staff_takahashi_shibuya')">
+                                    <i class="material-icons">check_circle</i>
+                                </button>
+                                <button class="btn-small blue darken-2 waves-effect" onclick="editUser('staff_takahashi_shibuya')">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">中</div>
+                                <div class="user-details">
+                                    <h6>中村 健一</h6>
+                                    <p class="user-id">ID: mgr_nakamura_ikebukuro</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>池袋店</td>
+                        <td><span class="role-chip role-manager">店長</span></td>
+                        <td>2024-08-05 07:15</td>
+                        <td><span class="status-chip status-active">アクティブ</span></td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-small blue darken-2 waves-effect" onclick="editUser('mgr_nakamura_ikebukuro')">
+                                    <i class="material-icons">edit</i>
+                                </button>
+                                <button class="btn-small orange waves-effect" onclick="resetPassword('mgr_nakamura_ikebukuro')">
+                                    <i class="material-icons">lock_reset</i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <h4>新規ユーザー追加</h4>
+            
+            <div class="form-section">
+                <h6>基本情報</h6>
+                <div class="row">
+                    <div class="input-field col s6">
+                        <input type="text" id="newUserName" required>
+                        <label for="newUserName">氏名</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input type="text" id="newUserId" required>
+                        <label for="newUserId">ユーザーID</label>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="input-field col s6">
+                        <input type="email" id="newUserEmail">
+                        <label for="newUserEmail">メールアドレス</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input type="tel" id="newUserPhone">
+                        <label for="newUserPhone">電話番号</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h6>権限・所属</h6>
+                <div class="row">
+                    <div class="input-field col s6">
+                        <select id="newUserStore" required>
+                            <option value="" disabled selected>店舗を選択</option>
+                            <option value="0">本部</option>
+                            <option value="1">新宿本店</option>
+                            <option value="2">渋谷店</option>
+                            <option value="3">池袋店</option>
+                            <option value="4">銀座店</option>
+                            <option value="5">横浜店</option>
+                        </select>
+                        <label>所属店舗</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <select id="newUserRole" required>
+                            <option value="" disabled selected>権限を選択</option>
+                            <option value="hq">本部スタッフ</option>
+                            <option value="manager">店長</option>
+                            <option value="staff">スタッフ</option>
+                        </select>
+                        <label>権限レベル</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h6>初期パスワード</h6>
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input type="password" id="newUserPassword" required>
+                        <label for="newUserPassword">初期パスワード</label>
+                    </div>
+                </div>
+                <p class="grey-text text-darken-1">
+                    <i class="material-icons tiny">info</i>
+                    初回ログイン時にパスワード変更を求めます
+                </p>
+            </div>
+        </div>
+        
+        <div class="modal-footer">
+            <button class="btn-flat waves-effect waves-red" onclick="closeModal('addUserModal')">キャンセル</button>
+            <button class="btn waves-effect waves-light green" onclick="createUser()">
+                <i class="material-icons left">person_add</i>
+                ユーザー作成
+            </button>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <a class="btn-floating btn-large blue darken-2 waves-effect waves-light" onclick="exportUsers()">
+            <i class="material-icons">file_download</i>
+        </a>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize form elements
+            M.FormSelect.init(document.querySelectorAll('select'));
+            M.Modal.init(document.querySelectorAll('.modal'));
+        });
+        
+        // Search and Filter Functions
+        function searchUsers() {
+            M.toast({html: 'ユーザー検索を実行中...'});
+        }
+        
+        // User Management Functions
+        function editUser(userId) {
+            M.toast({html: `ユーザー ${userId} の編集画面を開きます`});
+        }
+        
+        function deactivateUser(userId) {
+            if (confirm('このユーザーを非アクティブにしますか？')) {
+                M.toast({html: `ユーザー ${userId} を非アクティブにしました`});
+            }
+        }
+        
+        function activateUser(userId) {
+            if (confirm('このユーザーをアクティブにしますか？')) {
+                M.toast({html: `ユーザー ${userId} をアクティブにしました`});
+            }
+        }
+        
+        function resetPassword(userId) {
+            if (confirm('このユーザーのパスワードをリセットしますか？')) {
+                M.toast({html: `ユーザー ${userId} のパスワードをリセットしました`});
+            }
+        }
+        
+        // Modal Functions
+        function openAddUserModal() {
+            const modal = M.Modal.getInstance(document.getElementById('addUserModal'));
+            modal.open();
+        }
+        
+        function closeModal(modalId) {
+            const modal = M.Modal.getInstance(document.getElementById(modalId));
+            modal.close();
+        }
+        
+        function createUser() {
+            const name = document.getElementById('newUserName').value;
+            const userId = document.getElementById('newUserId').value;
+            const store = document.getElementById('newUserStore').value;
+            const role = document.getElementById('newUserRole').value;
+            
+            if (!name || !userId || !store || !role) {
+                M.toast({html: '必須項目を入力してください'});
+                return;
+            }
+            
+            M.toast({html: `新規ユーザー ${name} を作成しました`});
+            closeModal('addUserModal');
+            
+            // Clear form
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserId').value = '';
+            document.getElementById('newUserEmail').value = '';
+            document.getElementById('newUserPhone').value = '';
+            document.getElementById('newUserPassword').value = '';
+            M.FormSelect.init(document.querySelectorAll('select'));
+        }
+        
+        function exportUsers() {
+            M.toast({html: 'ユーザーリストをCSVで出力します'});
+        }
+    </script>
+</body>
+</html>

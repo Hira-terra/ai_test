@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レジ精算 - 眼鏡店顧客管理システム</title>
+    
+    <!-- Material UI CDN -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+        }
+        
+        /* Header */
+        .navbar-fixed nav {
+            background-color: #1976d2;
+        }
+        
+        .nav-wrapper {
+            padding: 0 24px;
+        }
+        
+        .brand-logo {
+            font-size: 20px;
+        }
+        
+        /* Main Container */
+        .main-container {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Status Header */
+        .status-header {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+            margin-left: 16px;
+        }
+        
+        .status-closed {
+            background-color: #e0e0e0;
+            color: #666;
+        }
+        
+        .status-open {
+            background-color: #4caf50;
+            color: white;
+        }
+        
+        .status-settled {
+            background-color: #2196f3;
+            color: white;
+        }
+        
+        /* Content Cards */
+        .content-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        
+        /* Amount Display */
+        .amount-display {
+            font-size: 32px;
+            font-weight: 500;
+            color: #1976d2;
+            text-align: right;
+            margin: 16px 0;
+        }
+        
+        .amount-label {
+            font-size: 14px;
+            color: #666;
+            text-align: right;
+        }
+        
+        /* Denomination Input */
+        .denomination-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        
+        .denomination-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .denomination-label {
+            min-width: 80px;
+            font-weight: 500;
+        }
+        
+        .denomination-input {
+            width: 80px !important;
+            text-align: right;
+        }
+        
+        .denomination-amount {
+            color: #666;
+            font-size: 14px;
+            margin-left: 8px;
+        }
+        
+        /* Sales Summary */
+        .sales-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .summary-row:last-child {
+            border-bottom: none;
+            font-weight: 500;
+            font-size: 18px;
+            margin-top: 8px;
+            padding-top: 20px;
+            border-top: 2px solid #333;
+        }
+        
+        .summary-label {
+            color: #333;
+        }
+        
+        .summary-value {
+            color: #1976d2;
+            font-weight: 500;
+        }
+        
+        /* Difference Display */
+        .difference-display {
+            background: #fff3e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .difference-amount {
+            font-size: 28px;
+            font-weight: 500;
+            margin: 8px 0;
+        }
+        
+        .difference-over {
+            color: #f44336;
+        }
+        
+        .difference-short {
+            color: #ff9800;
+        }
+        
+        .difference-match {
+            color: #4caf50;
+        }
+        
+        /* Quick Amount Buttons */
+        .quick-amounts {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+        
+        .quick-amount-btn {
+            padding: 8px 16px;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+        
+        /* Report Section */
+        .report-section {
+            background: #e8f5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .report-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .report-item {
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        
+        .report-label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .report-value {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin-top: 4px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .denomination-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-buttons .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper">
+                <a href="/" class="brand-logo">
+                    <i class="material-icons left">remove_red_eye</i>
+                    眼鏡店顧客管理システム
+                </a>
+                <ul class="right">
+                    <li><a href="#"><i class="material-icons left">store</i>新宿本店</a></li>
+                    <li><a href="#"><i class="material-icons left">person</i>田中太郎</a></li>
+                    <li><a href="/logout"><i class="material-icons">exit_to_app</i></a></li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Status Header -->
+        <div class="status-header">
+            <h4 style="margin: 0; display: inline-block;">
+                レジ精算
+                <span id="currentDate" style="font-size: 18px; color: #666; margin-left: 16px;">2025年8月8日（木）</span>
+            </h4>
+            <span id="statusBadge" class="status-badge status-open">営業中</span>
+        </div>
+        
+        <!-- レジ開設済み・営業中の画面 -->
+        <div id="openState">
+            <!-- 売上集計 -->
+            <div class="content-card">
+                <h5><i class="material-icons left">assessment</i>本日の売上集計</h5>
+                <div class="sales-summary">
+                    <div class="summary-row">
+                        <span class="summary-label">現金売上</span>
+                        <span class="summary-value">¥125,800</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">クレジットカード</span>
+                        <span class="summary-value">¥238,600</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">電子マネー</span>
+                        <span class="summary-value">¥45,200</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">売掛金回収</span>
+                        <span class="summary-value">¥32,000</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">合計売上高</span>
+                        <span class="summary-value">¥441,600</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 24px;">
+                    <p style="color: #666; margin-bottom: 8px;">レジ内現金予定額（釣銭準備金 + 現金売上 + 売掛回収）</p>
+                    <div class="amount-display">¥207,800</div>
+                </div>
+            </div>
+            
+            <!-- レジ精算 -->
+            <div class="content-card">
+                <h5><i class="material-icons left">calculate</i>レジ金実査</h5>
+                
+                <!-- 金種別入力 -->
+                <h6>紙幣</h6>
+                <div class="denomination-grid">
+                    <div class="denomination-item">
+                        <span class="denomination-label">10,000円</span>
+                        <input type="number" class="denomination-input" id="bill10000" value="10" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥100,000</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">5,000円</span>
+                        <input type="number" class="denomination-input" id="bill5000" value="8" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥40,000</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">2,000円</span>
+                        <input type="number" class="denomination-input" id="bill2000" value="0" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥0</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">1,000円</span>
+                        <input type="number" class="denomination-input" id="bill1000" value="67" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥67,000</span>
+                    </div>
+                </div>
+                
+                <h6 style="margin-top: 24px;">硬貨</h6>
+                <div class="denomination-grid">
+                    <div class="denomination-item">
+                        <span class="denomination-label">500円</span>
+                        <input type="number" class="denomination-input" id="coin500" value="1" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥500</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">100円</span>
+                        <input type="number" class="denomination-input" id="coin100" value="3" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥300</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">50円</span>
+                        <input type="number" class="denomination-input" id="coin50" value="0" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥0</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">10円</span>
+                        <input type="number" class="denomination-input" id="coin10" value="0" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥0</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">5円</span>
+                        <input type="number" class="denomination-input" id="coin5" value="0" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥0</span>
+                    </div>
+                    <div class="denomination-item">
+                        <span class="denomination-label">1円</span>
+                        <input type="number" class="denomination-input" id="coin1" value="0" onchange="calculateTotal()">
+                        <span class="denomination-amount">= ¥0</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 32px; text-align: right;">
+                    <p class="amount-label">実査合計金額</p>
+                    <div class="amount-display" id="actualTotal">¥207,800</div>
+                </div>
+            </div>
+            
+            <!-- 差異表示 -->
+            <div class="content-card">
+                <h5><i class="material-icons left">compare_arrows</i>照合結果</h5>
+                <div class="difference-display">
+                    <p style="margin: 0; color: #666;">過不足金額</p>
+                    <div class="difference-amount difference-match" id="differenceAmount">¥0</div>
+                    <p style="margin: 0; color: #666; font-size: 14px;">差異なし</p>
+                </div>
+                
+                <div class="input-field" style="margin-top: 24px;">
+                    <textarea id="differenceReason" class="materialize-textarea" placeholder="差異が発生した場合は理由を記入してください"></textarea>
+                    <label for="differenceReason">差異理由</label>
+                </div>
+            </div>
+            
+            <!-- アクションボタン -->
+            <div class="action-buttons">
+                <button class="btn waves-effect waves-light grey" onclick="saveDraft()">
+                    <i class="material-icons left">save</i>一時保存
+                </button>
+                <button class="btn waves-effect waves-light blue darken-2 modal-trigger" href="#confirmModal">
+                    <i class="material-icons left">check_circle</i>精算確定
+                </button>
+            </div>
+        </div>
+        
+        <!-- レジ未開設の画面 -->
+        <div id="closedState" style="display: none;">
+            <div class="content-card" style="text-align: center; padding: 60px 24px;">
+                <i class="material-icons" style="font-size: 80px; color: #ccc;">point_of_sale</i>
+                <h5 style="margin-top: 24px;">本日のレジはまだ開設されていません</h5>
+                <p style="color: #666; margin-bottom: 32px;">営業を開始するにはレジを開設してください</p>
+                <button class="btn-large waves-effect waves-light green modal-trigger" href="#openModal">
+                    <i class="material-icons left">play_arrow</i>レジを開設する
+                </button>
+            </div>
+        </div>
+        
+        <!-- レジ精算済みの画面 -->
+        <div id="settledState" style="display: none;">
+            <div class="content-card">
+                <h5><i class="material-icons left">check_circle</i>本日の精算は完了しています</h5>
+                <div class="report-section">
+                    <h6>精算レポート</h6>
+                    <div class="report-info">
+                        <div class="report-item">
+                            <div class="report-label">精算時刻</div>
+                            <div class="report-value">21:35</div>
+                        </div>
+                        <div class="report-item">
+                            <div class="report-label">精算担当者</div>
+                            <div class="report-value">田中太郎</div>
+                        </div>
+                        <div class="report-item">
+                            <div class="report-label">承認者</div>
+                            <div class="report-value">店長 山田花子</div>
+                        </div>
+                        <div class="report-item">
+                            <div class="report-label">過不足金</div>
+                            <div class="report-value">¥0</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 32px;">
+                    <button class="btn waves-effect waves-light" onclick="printReport()">
+                        <i class="material-icons left">print</i>精算書を印刷
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- レジ開設モーダル -->
+    <div id="openModal" class="modal">
+        <div class="modal-content">
+            <h4>レジ開設</h4>
+            <p>営業開始時の釣銭準備金を設定してください</p>
+            
+            <div class="quick-amounts">
+                <span style="margin-right: 16px; color: #666;">よく使う金額：</span>
+                <button class="btn-small quick-amount-btn" onclick="setQuickAmount(50000)">¥50,000</button>
+                <button class="btn-small quick-amount-btn" onclick="setQuickAmount(80000)">¥80,000</button>
+                <button class="btn-small quick-amount-btn" onclick="setQuickAmount(100000)">¥100,000</button>
+            </div>
+            
+            <div class="input-field">
+                <input id="openingCash" type="number" value="50000">
+                <label for="openingCash" class="active">釣銭準備金</label>
+            </div>
+            
+            <div class="input-field">
+                <input id="carryOver" type="number" value="0" disabled>
+                <label for="carryOver" class="active">前日繰越金</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-red btn-flat">キャンセル</a>
+            <a href="#!" onclick="openRegister()" class="waves-effect waves-green btn">開設する</a>
+        </div>
+    </div>
+    
+    <!-- 精算確定モーダル -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h4>精算確定確認</h4>
+            <p>以下の内容で精算を確定します。よろしいですか？</p>
+            
+            <div class="sales-summary" style="margin-top: 24px;">
+                <div class="summary-row">
+                    <span class="summary-label">レジ内現金予定額</span>
+                    <span class="summary-value">¥207,800</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">実査金額</span>
+                    <span class="summary-value">¥207,800</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">過不足金</span>
+                    <span class="summary-value difference-match">¥0</span>
+                </div>
+            </div>
+            
+            <div class="input-field" style="margin-top: 24px;">
+                <input id="approverPassword" type="password">
+                <label for="approverPassword">店長パスワード（承認用）</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-red btn-flat">戻る</a>
+            <a href="#!" onclick="settleRegister()" class="waves-effect waves-green btn">確定する</a>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Initialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            M.Modal.init(document.querySelectorAll('.modal'));
+            M.updateTextFields();
+            
+            // 日付表示
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short'
+            });
+            document.getElementById('currentDate').textContent = dateStr;
+        });
+        
+        // 金額計算
+        function calculateTotal() {
+            const denominations = [
+                { id: 'bill10000', value: 10000 },
+                { id: 'bill5000', value: 5000 },
+                { id: 'bill2000', value: 2000 },
+                { id: 'bill1000', value: 1000 },
+                { id: 'coin500', value: 500 },
+                { id: 'coin100', value: 100 },
+                { id: 'coin50', value: 50 },
+                { id: 'coin10', value: 10 },
+                { id: 'coin5', value: 5 },
+                { id: 'coin1', value: 1 }
+            ];
+            
+            let total = 0;
+            denominations.forEach(denom => {
+                const count = parseInt(document.getElementById(denom.id).value) || 0;
+                const amount = count * denom.value;
+                total += amount;
+                
+                // 金額表示更新
+                const amountSpan = document.getElementById(denom.id).parentElement.querySelector('.denomination-amount');
+                amountSpan.textContent = `= ¥${amount.toLocaleString()}`;
+            });
+            
+            document.getElementById('actualTotal').textContent = `¥${total.toLocaleString()}`;
+            
+            // 差異計算
+            const expected = 207800; // 実際は動的に取得
+            const difference = total - expected;
+            const diffElement = document.getElementById('differenceAmount');
+            
+            diffElement.textContent = `¥${Math.abs(difference).toLocaleString()}`;
+            diffElement.className = 'difference-amount';
+            
+            if (difference > 0) {
+                diffElement.classList.add('difference-over');
+                diffElement.nextElementSibling.textContent = `${difference.toLocaleString()}円 過剰`;
+            } else if (difference < 0) {
+                diffElement.classList.add('difference-short');
+                diffElement.nextElementSibling.textContent = `${Math.abs(difference).toLocaleString()}円 不足`;
+            } else {
+                diffElement.classList.add('difference-match');
+                diffElement.nextElementSibling.textContent = '差異なし';
+            }
+        }
+        
+        // クイック金額設定
+        function setQuickAmount(amount) {
+            document.getElementById('openingCash').value = amount;
+            M.updateTextFields();
+        }
+        
+        // レジ開設
+        function openRegister() {
+            const amount = document.getElementById('openingCash').value;
+            
+            // APIコール（実装時）
+            M.toast({html: `釣銭準備金 ¥${parseInt(amount).toLocaleString()} でレジを開設しました`});
+            
+            // UIを営業中状態に変更
+            document.getElementById('closedState').style.display = 'none';
+            document.getElementById('openState').style.display = 'block';
+            document.getElementById('statusBadge').className = 'status-badge status-open';
+            document.getElementById('statusBadge').textContent = '営業中';
+            
+            const modal = M.Modal.getInstance(document.getElementById('openModal'));
+            modal.close();
+        }
+        
+        // 一時保存
+        function saveDraft() {
+            M.toast({html: '精算データを一時保存しました'});
+        }
+        
+        // 精算確定
+        function settleRegister() {
+            const password = document.getElementById('approverPassword').value;
+            
+            if (!password) {
+                M.toast({html: '店長パスワードを入力してください', classes: 'red'});
+                return;
+            }
+            
+            // APIコール（実装時）
+            M.toast({html: '精算が完了しました'});
+            
+            // UIを精算済み状態に変更
+            document.getElementById('openState').style.display = 'none';
+            document.getElementById('settledState').style.display = 'block';
+            document.getElementById('statusBadge').className = 'status-badge status-settled';
+            document.getElementById('statusBadge').textContent = '精算済み';
+            
+            const modal = M.Modal.getInstance(document.getElementById('confirmModal'));
+            modal.close();
+        }
+        
+        // レポート印刷
+        function printReport() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

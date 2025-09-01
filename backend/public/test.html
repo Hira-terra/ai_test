@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript Test</title>
+</head>
+<body>
+    <h1>JavaScript動作テスト</h1>
+    
+    <button id="testButton" onclick="testClick()">テストボタン</button>
+    <div id="result"></div>
+    
+    <form id="testForm">
+        <input type="text" id="testInput" value="test" />
+        <button type="submit">フォーム送信テスト</button>
+    </form>
+    
+    <div id="formResult"></div>
+
+    <script>
+        console.log('Test page loaded');
+        
+        function testClick() {
+            console.log('Test button clicked');
+            document.getElementById('result').innerHTML = 'ボタンが正常にクリックされました！';
+        }
+        
+        document.getElementById('testForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('Form submitted');
+            document.getElementById('formResult').innerHTML = 'フォームが正常に送信されました！';
+        });
+        
+        // ページ読み込み完了の確認
+        window.addEventListener('load', function() {
+            console.log('Page fully loaded');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,523 @@
+// Page ID: S-004 受注一覧ページ
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  IconButton,
+  Tooltip,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  TextField,
+  Alert,
+  Pagination,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+} from '@mui/material';
+import {
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  LocalShipping as ShippingIcon,
+  CheckCircle as CompleteIcon,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Receipt as ReceiptIcon,
+} from '@mui/icons-material';
+import MockBanner from '@/components/MockBanner';
+import { Order, OrderStatus, PaymentMethod, PaginationInfo } from '@/types';
+import { mockOrderService } from '@/services/mock/order.service';
+
+const OrderListPage: React.FC = () => {
+  const navigate = useNavigate();
+  
+  // データ状態
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
+  
+  // フィルタ状態
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | ''>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  
+  // UI状態
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [detailDialog, setDetailDialog] = useState(false);
+
+  // 初期化
+  useEffect(() => {
+    loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page]);
+
+  const loadOrders = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // @MOCK_TO_API: 受注一覧取得
+      const response = await mockOrderService.getOrders({
+        page: pagination.page,
+        limit: pagination.limit,
+        status: statusFilter || undefined,
+        paymentMethod: paymentFilter || undefined,
+        search: searchQuery || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+      
+      if (response.success && response.data) {
+        setOrders(response.data);
+        if (response.meta?.pagination) {
+          setPagination(response.meta.pagination);
+        }
+      } else {
+        throw new Error(response.error?.message || '受注一覧の取得に失敗しました。');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadOrders();
+  };
+
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    setPagination(prev => ({ ...prev, page: value }));
+  };
+
+  const handleViewOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailDialog(true);
+  };
+
+  const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
+    try {
+      // @MOCK_TO_API: 受注ステータス更新
+      const response = await mockOrderService.updateOrderStatus(orderId, status);
+      
+      if (response.success) {
+        await loadOrders(); // データ再読み込み
+      } else {
+        throw new Error(response.error?.message || 'ステータス更新に失敗しました。');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+      case 'ordered': return 'info';
+      case 'in_production': return 'warning';
+      case 'ready': return 'success';
+      case 'delivered': return 'default';
+      case 'cancelled': return 'error';
+      default: return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: OrderStatus) => {
+    switch (status) {
+      case 'ordered': return '受注済';
+      case 'in_production': return '製作中';
+      case 'ready': return '完成・お渡し待ち';
+      case 'delivered': return 'お渡し完了';
+      case 'cancelled': return 'キャンセル';
+      default: return status;
+    }
+  };
+
+  const getPaymentMethodLabel = (method: PaymentMethod) => {
+    switch (method) {
+      case 'cash': return '現金';
+      case 'credit': return 'クレジットカード';
+      case 'electronic': return '電子マネー';
+      case 'receivable': return '売掛';
+      default: return method;
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ja-JP', { 
+      style: 'currency', 
+      currency: 'JPY' 
+    }).format(amount);
+  };
+
+  return (
+    <Box>
+      {/* @MOCK_UI: モック使用バナー */}
+      <MockBanner message="受注管理機能 - モックデータを使用中" />
+      
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight="bold">
+          受注管理
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/orders/new')}
+        >
+          新規受注
+        </Button>
+      </Box>
+
+      {/* 検索・フィルタエリア */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={3}>
+              <TextField
+                fullWidth
+                size="small"
+                label="受注番号・顧客名検索"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="O-001 または 山田太郎"
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>ステータス</InputLabel>
+                <Select
+                  value={statusFilter}
+                  label="ステータス"
+                  onChange={(e) => setStatusFilter(e.target.value as OrderStatus)}
+                >
+                  <MenuItem value="">すべて</MenuItem>
+                  <MenuItem value="ordered">受注済</MenuItem>
+                  <MenuItem value="in_production">製作中</MenuItem>
+                  <MenuItem value="ready">完成・お渡し待ち</MenuItem>
+                  <MenuItem value="delivered">お渡し完了</MenuItem>
+                  <MenuItem value="cancelled">キャンセル</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>支払方法</InputLabel>
+                <Select
+                  value={paymentFilter}
+                  label="支払方法"
+                  onChange={(e) => setPaymentFilter(e.target.value as PaymentMethod)}
+                >
+                  <MenuItem value="">すべて</MenuItem>
+                  <MenuItem value="cash">現金</MenuItem>
+                  <MenuItem value="credit">クレジットカード</MenuItem>
+                  <MenuItem value="electronic">電子マネー</MenuItem>
+                  <MenuItem value="receivable">売掛</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="受注日（から）"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                size="small"
+                type="date"
+                label="受注日（まで）"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={1}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleSearch}
+                disabled={loading}
+                startIcon={<SearchIcon />}
+              >
+                検索
+              </Button>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* 受注一覧テーブル */}
+      <Card>
+        <CardContent>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">受注一覧</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {pagination.total}件見つかりました
+            </Typography>
+          </Box>
+
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>受注番号</TableCell>
+                  <TableCell>受注日</TableCell>
+                  <TableCell>顧客名</TableCell>
+                  <TableCell>商品数</TableCell>
+                  <TableCell align="right">金額</TableCell>
+                  <TableCell align="right">入金額</TableCell>
+                  <TableCell align="right">残金</TableCell>
+                  <TableCell>支払方法</TableCell>
+                  <TableCell>納期</TableCell>
+                  <TableCell>ステータス</TableCell>
+                  <TableCell align="center">操作</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="bold">
+                        {order.orderNumber}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {order.orderDate.split('T')[0]}
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2">
+                          {order.customer?.fullName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {order.customer?.customerCode}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {order.items.length}点
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight="bold">
+                        {formatCurrency(order.totalAmount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatCurrency(order.paidAmount)}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography 
+                        variant="body2" 
+                        color={order.balanceAmount > 0 ? 'error' : 'success'}
+                        fontWeight="bold"
+                      >
+                        {formatCurrency(order.balanceAmount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {getPaymentMethodLabel(order.paymentMethod)}
+                    </TableCell>
+                    <TableCell>
+                      {order.deliveryDate ? order.deliveryDate.split('T')[0] : '未定'}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={getStatusLabel(order.status)}
+                        color={getStatusColor(order.status) as any}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box display="flex" gap={0.5}>
+                        <Tooltip title="詳細表示">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewOrder(order)}
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        {order.status === 'ordered' && (
+                          <Tooltip title="製作開始">
+                            <IconButton
+                              size="small"
+                              color="warning"
+                              onClick={() => handleStatusUpdate(order.id, 'in_production')}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {order.status === 'in_production' && (
+                          <Tooltip title="完成">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={() => handleStatusUpdate(order.id, 'ready')}
+                            >
+                              <CompleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {order.status === 'ready' && (
+                          <Tooltip title="お渡し完了">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleStatusUpdate(order.id, 'delivered')}
+                            >
+                              <ShippingIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {pagination.totalPages > 1 && (
+            <Box display="flex" justifyContent="center" mt={3}>
+              <Pagination
+                count={pagination.totalPages}
+                page={pagination.page}
+                onChange={handlePageChange}
+                color="primary"
+              />
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 受注詳細ダイアログ */}
+      <Dialog
+        open={detailDialog}
+        onClose={() => setDetailDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          受注詳細 - {selectedOrder?.orderNumber}
+        </DialogTitle>
+        <DialogContent>
+          {selectedOrder && (
+            <Grid container spacing={2}>
+              {/* 基本情報 */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>基本情報</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography><strong>受注日:</strong> {selectedOrder.orderDate.split('T')[0]}</Typography>
+                    <Typography><strong>納期:</strong> {selectedOrder.deliveryDate?.split('T')[0] || '未定'}</Typography>
+                    <Typography><strong>ステータス:</strong> {getStatusLabel(selectedOrder.status)}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography><strong>顧客名:</strong> {selectedOrder.customer?.fullName}</Typography>
+                    <Typography><strong>支払方法:</strong> {getPaymentMethodLabel(selectedOrder.paymentMethod)}</Typography>
+                    <Typography><strong>店舗:</strong> {selectedOrder.store?.name}</Typography>
+                  </Grid>
+                </Grid>
+              </Grid>
+              
+              {/* 商品明細 */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>商品明細</Typography>
+                <List>
+                  {selectedOrder.items.map((item, index) => (
+                    <ListItem key={index} divider>
+                      <ListItemText
+                        primary={item.product?.name}
+                        secondary={
+                          <Box>
+                            <Typography variant="body2">数量: {item.quantity}</Typography>
+                            <Typography variant="body2">単価: {formatCurrency(item.unitPrice)}</Typography>
+                            <Typography variant="body2">小計: {formatCurrency(item.totalPrice)}</Typography>
+                            {item.notes && (
+                              <Typography variant="body2" color="text.secondary">備考: {item.notes}</Typography>
+                            )}
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+              
+              {/* 金額情報 */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>金額情報</Typography>
+                <Box>
+                  <Typography>小計: {formatCurrency(selectedOrder.subtotalAmount)}</Typography>
+                  <Typography>消費税: {formatCurrency(selectedOrder.taxAmount)}</Typography>
+                  <Typography><strong>合計: {formatCurrency(selectedOrder.totalAmount)}</strong></Typography>
+                  <Typography>入金額: {formatCurrency(selectedOrder.paidAmount)}</Typography>
+                  <Typography color={selectedOrder.balanceAmount > 0 ? 'error' : 'success'}>
+                    <strong>残金: {formatCurrency(selectedOrder.balanceAmount)}</strong>
+                  </Typography>
+                </Box>
+              </Grid>
+              
+              {/* 備考 */}
+              {selectedOrder.notes && (
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom>備考</Typography>
+                  <Typography>{selectedOrder.notes}</Typography>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailDialog(false)}>閉じる</Button>
+          <Button variant="contained" startIcon={<ReceiptIcon />}>
+            領収書印刷
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default OrderListPage;
