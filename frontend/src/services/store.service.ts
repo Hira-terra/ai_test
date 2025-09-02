@@ -3,7 +3,7 @@ import { mockStoreService } from './mock/store.service';
 import { apiStoreService } from './api/store.service';
 
 // @REAL_API: 実APIを使用（データベース連携）
-const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true';
+const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true' || process.env.REACT_APP_USE_MOCK_API === 'true';
 
 // 実APIサービスに切り替え
 export const storeService = USE_MOCK ? mockStoreService : apiStoreService;

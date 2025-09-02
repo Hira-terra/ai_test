@@ -147,45 +147,43 @@ export class ProductService {
     try {
       logger.info('[PRODUCT_SERVICE] 利用可能フレーム取得開始');
       
-      // 現時点では、フレームカテゴリの商品をベースにモック的なフレーム情報を返す
+      // framesテーブルが空の場合、productsテーブルのframe categoryから疑似フレームデータを生成
       const query = `
         SELECT 
-          id,
-          product_code as "productCode",
-          name,
-          brand,
-          category,
-          management_type as "managementType",
-          cost_price as "costPrice",
-          retail_price as "retailPrice",
-          supplier,
-          is_active as "isActive"
-        FROM products
-        WHERE category = 'frame' AND is_active = true
-        ORDER BY brand, name
+          p.id,
+          p.product_code as "productCode",
+          p.name,
+          p.brand,
+          p.category,
+          p.cost_price as "costPrice",
+          p.retail_price as "retailPrice",
+          p.is_active as "isActive"
+        FROM products p
+        WHERE p.category = 'frame' AND p.is_active = true
+        ORDER BY p.brand, p.name
         LIMIT 20
       `;
       
       const result = await this.db.query(query);
       
-      // フレーム情報にモック的な詳細情報を付与
-      const frames = result.rows.map((product: any, index: number) => ({
-        id: `frame_${product.id}`,
-        serialNumber: `${product.productCode}-${String(index + 1).padStart(3, '0')}`,
+      // フレーム商品から疑似フレームデータを生成
+      const frames = result.rows.map((row: any) => ({
+        id: row.id, // 商品IDをフレームIDとして使用（暫定）
+        serialNumber: `${row.productCode}-01`,
         product: {
-          id: product.id,
-          productCode: product.productCode,
-          name: product.name,
-          brand: product.brand,
-          category: product.category,
-          retailPrice: product.retailPrice,
-          costPrice: product.costPrice,
-          isActive: product.isActive
+          id: row.id,
+          productCode: row.productCode,
+          name: row.name,
+          brand: row.brand,
+          category: row.category,
+          retailPrice: row.retailPrice,
+          costPrice: row.costPrice,
+          isActive: row.isActive
         },
-        color: ['ブラック', 'ブラウン', 'シルバー', 'ゴールド', 'ブルー'][index % 5],
-        size: ['52-16', '54-16', '56-16', '50-18', '52-18'][index % 5],
-        status: 'available' as const,
-        location: 'A-01'
+        color: '標準色',
+        size: 'M',
+        status: 'in_stock',
+        location: 'メイン'
       }));
       
       const duration = Date.now() - startTime;

@@ -52,9 +52,9 @@ import {
   PaymentMethod,
   OrderItem 
 } from '@/types';
-import { mockOrderService } from '@/services/mock/order.service';
 import { customerService } from '@/services/customer.service';
 import { productService } from '@/services/product.service';
+import { orderService } from '@/services/order.service';
 
 const OrderEntryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -116,10 +116,14 @@ const OrderEntryPage: React.FC = () => {
             setActiveStep(1); // 顧客が選択済みなので商品選択ステップへ
           }
 
-          // @MOCK_TO_API: 最新処方箋取得
-          const prescriptionResponse = await mockOrderService.getCustomerLatestPrescription(customerId);
-          if (prescriptionResponse.success && prescriptionResponse.data) {
-            setPrescription(prescriptionResponse.data);
+          // @REAL_API: 最新処方箋取得
+          const prescriptionResponse = await customerService.getCustomerPrescriptions(customerId);
+          if (prescriptionResponse.success && prescriptionResponse.data && prescriptionResponse.data.length > 0) {
+            // 最新の処方箋を取得（日付順でソート）
+            const latestPrescription = prescriptionResponse.data.sort((a: any, b: any) => 
+              new Date(b.measuredDate).getTime() - new Date(a.measuredDate).getTime()
+            )[0];
+            setPrescription(latestPrescription);
           }
         } else {
           // customerIdが無い場合は顧客選択ステップから開始
@@ -156,15 +160,17 @@ const OrderEntryPage: React.FC = () => {
 
   // 商品追加
   const addProduct = (product: Product, selectedFrame?: Frame) => {
+    const unitPrice = Math.floor(product.retailPrice); // 小数点以下を除去
     const newItem: Omit<OrderItem, 'id' | 'orderId'> = {
       productId: product.id,
       product,
-      frameId: selectedFrame?.id,
+      frameId: selectedFrame?.id || undefined, // nullではなくundefined
       frame: selectedFrame,
       quantity: 1,
-      unitPrice: product.retailPrice,
-      totalPrice: product.retailPrice,
-      notes: selectedFrame ? `${selectedFrame.serialNumber} (${selectedFrame.color})` : ''
+      unitPrice: unitPrice,
+      totalPrice: unitPrice,
+      prescriptionId: prescription?.id || undefined, // 処方箋IDを追加
+      notes: selectedFrame ? `${selectedFrame.serialNumber} (${selectedFrame.color})` : undefined // 空文字ではなくundefined
     };
 
     setOrderItems(prev => [...prev, newItem]);
@@ -255,9 +261,13 @@ const OrderEntryPage: React.FC = () => {
 
     // 選択した顧客の最新処方箋を取得
     try {
-      const prescriptionResponse = await mockOrderService.getCustomerLatestPrescription(selectedCustomer.id);
-      if (prescriptionResponse.success && prescriptionResponse.data) {
-        setPrescription(prescriptionResponse.data);
+      const prescriptionResponse = await customerService.getCustomerPrescriptions(selectedCustomer.id);
+      if (prescriptionResponse.success && prescriptionResponse.data && prescriptionResponse.data.length > 0) {
+        // 最新の処方箋を取得（日付順でソート）
+        const latestPrescription = prescriptionResponse.data.sort((a: any, b: any) => 
+          new Date(b.measuredDate).getTime() - new Date(a.measuredDate).getTime()
+        )[0];
+        setPrescription(latestPrescription);
       }
     } catch (err: any) {
       console.warn('処方箋情報の取得に失敗:', err.message);
@@ -281,15 +291,29 @@ const OrderEntryPage: React.FC = () => {
     setError(null);
 
     try {
-      // @MOCK_TO_API: 受注作成
-      const response = await mockOrderService.createOrder({
+      // @REAL_API: 受注作成
+      const orderData = {
         customerId: customer.id,
-        items: orderItems,
-        deliveryDate,
-        paymentMethod,
+        items: orderItems.map(item => ({
+          productId: item.productId,
+          frameId: item.frameId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          prescriptionId: item.prescriptionId,
+          notes: item.notes
+        })),
+        subtotalAmount: subtotal,
+        taxAmount: taxAmount,
+        totalAmount: totalAmount,
         paidAmount: isPartialPayment ? paidAmount : totalAmount,
-        notes
-      });
+        deliveryDate: deliveryDate || undefined,
+        paymentMethod,
+        notes: notes || undefined
+      };
+
+      console.log('🔍 DEBUG: 送信する受注データ:', JSON.stringify(orderData, null, 2));
+      
+      const response = await orderService.createOrder(orderData as any); // 型チェック回避
 
       if (response.success && response.data) {
         alert(`受注が正常に作成されました。\n受注番号: ${response.data.orderNumber}`);
