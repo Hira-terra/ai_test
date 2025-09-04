@@ -1,16 +1,83 @@
-// API統合レイヤー - モックと実APIの切り替え
-import { mockStoreService } from './mock/store.service';
+import { Store, CreateStoreRequest, UpdateStoreRequest } from '../types';
 import { apiStoreService } from './api/store.service';
 
-// @REAL_API: 実APIを使用（データベース連携）
-const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true' || process.env.REACT_APP_USE_MOCK_API === 'true';
+class StoreService {
+  async getAllStores(): Promise<Store[]> {
+    try {
+      const response = await apiStoreService.getAllStores();
+      if (!response.data) {
+        throw new Error('店舗データが取得できませんでした');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('店舗一覧取得エラー:', error);
+      throw error;
+    }
+  }
 
-// 実APIサービスに切り替え
-export const storeService = USE_MOCK ? mockStoreService : apiStoreService;
+  async getStoreById(id: string): Promise<Store> {
+    try {
+      const response = await apiStoreService.getStoreById(id);
+      if (!response.data) {
+        throw new Error('店舗データが取得できませんでした');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('店舗詳細取得エラー:', error);
+      throw error;
+    }
+  }
 
-// デバッグ用: 現在の動作モードをログ出力
-if (USE_MOCK) {
-  console.warn('⚠️ StoreService: モックモードで動作中');
-} else {
-  console.info('✅ StoreService: 実APIモードで動作中');
+  async createStore(data: CreateStoreRequest): Promise<Store> {
+    try {
+      const response = await apiStoreService.createStore(data);
+      if (!response.data) {
+        throw new Error('店舗作成に失敗しました');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('店舗作成エラー:', error);
+      throw error;
+    }
+  }
+
+  async updateStore(id: string, data: UpdateStoreRequest): Promise<Store> {
+    try {
+      const response = await apiStoreService.updateStore(id, data);
+      if (!response.data) {
+        throw new Error('店舗更新に失敗しました');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('店舗更新エラー:', error);
+      throw error;
+    }
+  }
+
+  async deleteStore(id: string): Promise<void> {
+    try {
+      await apiStoreService.deleteStore(id);
+    } catch (error) {
+      console.error('店舗削除エラー:', error);
+      throw error;
+    }
+  }
+
+  async getStoreStatistics(id: string): Promise<any> {
+    try {
+      const response = await apiStoreService.getStoreStatistics(id);
+      if (!response.data) {
+        throw new Error('店舗統計データが取得できませんでした');
+      }
+      return response.data;
+    } catch (error) {
+      console.error('店舗統計取得エラー:', error);
+      throw error;
+    }
+  }
 }
+
+export const storeService = new StoreService();
+
+// デバッグ用: 動作モードをログ出力
+console.info('✅ StoreService: 実APIモードで動作中');

@@ -189,6 +189,32 @@ export interface User {
   lastLoginAt?: DateString;
 }
 
+export interface CreateUserRequest {
+  userCode: string;
+  name: string;
+  email?: string;
+  password: string;
+  role: UserRole;
+  storeId: string;
+  isActive?: boolean;
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+  isActive?: boolean;
+}
+
+export interface UserSearchParams {
+  storeId?: string;
+  role?: string;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+}
+
 // =================================================================
 // 店舗関連型
 // =================================================================
@@ -199,6 +225,27 @@ export interface Store {
   address: string;
   phone?: string;
   managerName?: string;
+  isActive?: boolean;
+  createdAt?: DateString;
+  updatedAt?: DateString;
+}
+
+export interface CreateStoreRequest {
+  storeCode: string;
+  name: string;
+  address: string;
+  phone?: string;
+  managerName?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateStoreRequest {
+  storeCode?: string;
+  name?: string;
+  address?: string;
+  phone?: string;
+  managerName?: string;
+  isActive?: boolean;
 }
 
 // =================================================================
@@ -343,6 +390,7 @@ export interface Order {
   items: OrderItem[];
   payments?: Payment[];
   createdBy: UUID;
+  createdByUser?: User;
   createdAt: DateString;
   updatedAt: DateString;
 }

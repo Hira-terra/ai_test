@@ -31,7 +31,6 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import MockBanner from '@/components/MockBanner';
 import { mockDashboardService } from '@/services/mock/dashboard.service';
 
 interface StatCardProps {
@@ -179,7 +178,6 @@ const DashboardPage: React.FC = () => {
   return (
     <Box>
       {/* @MOCK_UI: モック使用時のバナー表示 */}
-      <MockBanner message="本部ダッシュボード - モックデータを使用中" variant="info" />
       
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>

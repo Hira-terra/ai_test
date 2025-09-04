@@ -49,7 +49,6 @@ import {
 } from '@mui/icons-material';
 import { Customer, CustomerSearchParams, PaginationInfo } from '@/types';
 import { customerService } from '@/services/customer.service';
-import MockBanner from '@/components/MockBanner';
 
 const CustomerSearchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -160,7 +159,6 @@ const CustomerSearchPage: React.FC = () => {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       {/* @MOCK_UI: モック使用時のバナー表示 */}
-      <MockBanner message="顧客データはモックデータです" />
       
       {/* Search Section - Compact Design */}
       <Card sx={{ mb: 3, p: 3 }}>

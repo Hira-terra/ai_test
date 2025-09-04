@@ -119,12 +119,12 @@ export class CustomerRepository {
       const query = `
         INSERT INTO customers (
           customer_code, last_name, first_name, last_name_kana, first_name_kana,
-          full_name, full_name_kana, gender, birth_date, phone, mobile,
+          gender, birth_date, phone, mobile,
           email, postal_code, address, first_visit_date, visit_count,
           total_purchase_amount, notes, store_id
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
         )
         RETURNING *
       `;
@@ -135,8 +135,6 @@ export class CustomerRepository {
         customer.firstName,
         customer.lastNameKana || null,
         customer.firstNameKana || null,
-        customer.fullName,
-        customer.fullNameKana || null,
         customer.gender || null,
         customer.birthDate || null,
         customer.phone || null,
@@ -210,8 +208,8 @@ export class CustomerRepository {
         firstName: 'first_name',
         lastNameKana: 'last_name_kana',
         firstNameKana: 'first_name_kana',
-        fullName: 'full_name',
-        fullNameKana: 'full_name_kana',
+        // fullName: フロントエンドから送信されるが、DBには存在しないのでスキップ
+        // fullNameKana: フロントエンドから送信されるが、DBには存在しないのでスキップ
         gender: 'gender',
         birthDate: 'birth_date',
         phone: 'phone',

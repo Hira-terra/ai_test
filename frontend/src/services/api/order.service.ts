@@ -86,6 +86,7 @@ export const apiOrderService = {
   getOrders: async (params?: {
     customerId?: string;
     status?: OrderStatus;
+    search?: string;
     fromDate?: string;
     toDate?: string;
     page?: number;
@@ -97,6 +98,7 @@ export const apiOrderService = {
       const queryParams = new URLSearchParams();
       if (params?.customerId) queryParams.append('customerId', params.customerId);
       if (params?.status) queryParams.append('status', params.status);
+      if (params?.search) queryParams.append('search', params.search);
       if (params?.fromDate) queryParams.append('fromDate', params.fromDate);
       if (params?.toDate) queryParams.append('toDate', params.toDate);
       if (params?.page) queryParams.append('page', params.page.toString());
@@ -190,6 +192,29 @@ export const apiOrderService = {
         error: {
           code: 'NETWORK_ERROR',
           message: error.message || '受注のキャンセルに失敗しました。'
+        }
+      };
+    }
+  },
+
+  // 入金追加
+  addPayment: async (orderId: string, paymentData: {
+    paymentAmount: number;
+    paymentMethod: PaymentMethod;
+    notes?: string;
+  }): Promise<ApiResponse<any>> => {
+    console.info('✅ Using REAL API for payment addition');
+    
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.ORDERS.PAYMENT_CREATE(orderId), paymentData);
+      return response;
+    } catch (error: any) {
+      console.error('❌ Payment addition failed:', error);
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error.message || '入金の追加に失敗しました。'
         }
       };
     }

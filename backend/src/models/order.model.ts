@@ -13,7 +13,8 @@ import {
   Store,
   Product,
   Frame,
-  Prescription
+  Prescription,
+  User
 } from '../types';
 
 export interface OrderModel {
@@ -73,6 +74,8 @@ export class OrderRepository {
     customer_code?: string;
     store_name?: string;
     store_code?: string;
+    created_by_name?: string;
+    created_by_user_code?: string;
   }): Order {
     return {
       id: row.id,
@@ -109,6 +112,19 @@ export class OrderRepository {
       items: [], // 別途取得
       payments: [], // 別途取得
       createdBy: row.created_by,
+      createdByUser: row.created_by_name ? {
+        id: row.created_by,
+        userCode: row.created_by_user_code || '',
+        name: row.created_by_name,
+        role: 'staff',
+        isActive: true,
+        store: {
+          id: row.store_id,
+          storeCode: row.store_code || '',
+          name: row.store_name || '',
+          address: ''
+        }
+      } as User : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -224,10 +240,13 @@ export class OrderRepository {
         c.first_name as customer_first_name,
         c.customer_code,
         s.name as store_name,
-        s.store_code
+        s.store_code,
+        u.name as created_by_name,
+        u.user_code as created_by_user_code
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       LEFT JOIN stores s ON o.store_id = s.id
+      LEFT JOIN users u ON o.created_by = u.id
       WHERE ${whereClause}
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -271,10 +290,13 @@ export class OrderRepository {
         c.first_name as customer_first_name,
         c.customer_code,
         s.name as store_name,
-        s.store_code
+        s.store_code,
+        u.name as created_by_name,
+        u.user_code as created_by_user_code
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       LEFT JOIN stores s ON o.store_id = s.id
+      LEFT JOIN users u ON o.created_by = u.id
       WHERE o.id = $1
     `;
 
@@ -349,6 +371,7 @@ export class OrderRepository {
       frameId?: string;
       quantity: number;
       unitPrice: number;
+      totalPrice: number;
       prescriptionId?: string;
       notes?: string;
     }>;
@@ -391,9 +414,9 @@ export class OrderRepository {
         const itemQuery = `
           INSERT INTO order_items (
             id, order_id, product_id, frame_id, quantity, 
-            unit_price, prescription_id, notes
+            unit_price, total_price, prescription_id, notes
           ) VALUES (
-            gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7
+            gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8
           )
         `;
 
@@ -403,6 +426,7 @@ export class OrderRepository {
           item.frameId,
           item.quantity,
           item.unitPrice,
+          item.totalPrice,
           item.prescriptionId,
           item.notes
         ]);

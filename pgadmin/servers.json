@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "眼鏡店顧客管理システム - PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "glasses_store_db",
+      "Username": "glasses_user",
+      "PassFile": "/var/lib/pgadmin/pgpass",
+      "SSLMode": "prefer",
+      "Comment": "眼鏡店顧客管理システムのメインデータベース"
+    }
+  }
+}

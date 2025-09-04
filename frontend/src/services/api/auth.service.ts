@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:300
 
 // APIクライアント
 const apiClient = {
-  post: async (url: string, data?: any) => {
+  post: async (url: string, data?: any, options?: { showDetailedErrors?: boolean }) => {
     const fullUrl = `${API_BASE_URL}${url}`;
     console.log('🌐 POST Request:', fullUrl);
     console.log('📦 Request body:', data);
@@ -26,7 +26,7 @@ const apiClient = {
       const errorText = await response.text().catch(() => '');
       console.error('❌ Raw error response:', errorText);
       
-      let errorData = {};
+      let errorData: any = {};
       try {
         errorData = JSON.parse(errorText);
         console.error('❌ Parsed error response:', errorData);
@@ -34,7 +34,35 @@ const apiClient = {
         console.error('❌ Failed to parse error response as JSON');
       }
       
-      throw new Error((errorData as any).message || `HTTP error! status: ${response.status}`);
+      // コンテキストに応じたエラーメッセージに変換
+      let userMessage = 'ログインに失敗しました。';
+      const showDetailedErrors = options?.showDetailedErrors || false;
+      
+      if (errorData.error) {
+        if (errorData.error.code === 'VALIDATION_ERROR') {
+          if (showDetailedErrors) {
+            // パスワード設定画面など：詳細なバリデーションエラーを表示
+            if (errorData.error.details && Array.isArray(errorData.error.details)) {
+              userMessage = errorData.error.details.join('、');
+            } else {
+              userMessage = errorData.error.message || '入力内容に誤りがあります。';
+            }
+          } else {
+            // ログイン画面：詳細を隠してユーザーフレンドリーなメッセージ
+            userMessage = 'ユーザーコード、パスワード、または店舗の選択を確認してください。';
+          }
+        } else if (errorData.error.code === 'AUTHENTICATION_FAILED') {
+          userMessage = 'ユーザーコード、パスワード、または店舗の選択を確認してください。';
+        } else if (errorData.error.code === 'RATE_LIMIT_EXCEEDED') {
+          const retryAfter = errorData.error.details?.retryAfter || 60;
+          userMessage = `ログイン試行回数が上限に達しました。${retryAfter}秒後に再試行してください。`;
+        } else {
+          // その他のエラーではバックエンドのメッセージを使用
+          userMessage = errorData.error.message || userMessage;
+        }
+      }
+      
+      throw new Error(userMessage);
     }
     
     const result = await response.json();
@@ -57,6 +85,11 @@ const apiClient = {
     }
     
     return response.json();
+  },
+
+  // 詳細なエラーメッセージを表示するPOSTメソッド（ユーザー管理画面用）
+  postWithDetailedErrors: async (url: string, data?: any) => {
+    return apiClient.post(url, data, { showDetailedErrors: true });
   }
 };
 
@@ -198,6 +231,42 @@ export const apiAuthService = {
         error: {
           code: 'AUTHENTICATION_FAILED',
           message: error.message || 'トークンの更新に失敗しました。'
+        }
+      };
+    }
+  },
+
+  // ユーザー管理画面向けのログインテスト（詳細エラーメッセージ付き）
+  testLoginWithDetailedErrors: async (credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
+    console.info('✅ Using REAL API for authentication (with detailed errors)');
+    
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials, { showDetailedErrors: true });
+      
+      if (response.success && response.data) {
+        return {
+          success: true,
+          data: {
+            user: response.data.user,
+            token: response.data.token,
+            expiresIn: response.data.expiresIn
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: response.error || {
+            code: 'AUTHENTICATION_FAILED',
+            message: 'ログインに失敗しました。'
+          }
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: {
+          code: 'AUTHENTICATION_FAILED',
+          message: error.message || 'ログインに失敗しました。'
         }
       };
     }

@@ -18,13 +18,26 @@ export class ProductController {
     const startTime = Date.now();
     
     try {
-      const { category, available_only } = req.query;
+      const { category, search, isActive, managementType, page, limit, available_only } = req.query;
       
       logger.info(`[PRODUCT_CONTROLLER] 商品一覧取得リクエスト受信`);
-      logger.info(`[PRODUCT_CONTROLLER] パラメータ: category=${category}, available_only=${available_only}`);
+      logger.info(`[PRODUCT_CONTROLLER] パラメータ:`, {
+        category,
+        search,
+        isActive,
+        managementType,
+        page,
+        limit,
+        available_only
+      });
 
       const result = await this.productService.getAllProducts({
         category: category ? String(category) : undefined,
+        search: search ? String(search) : undefined,
+        isActive: isActive !== undefined ? isActive === 'true' : undefined,
+        managementType: managementType ? String(managementType) : undefined,
+        page: page ? parseInt(String(page)) : undefined,
+        limit: limit ? parseInt(String(limit)) : undefined,
         availableOnly: available_only === 'true'
       });
 
@@ -45,6 +58,137 @@ export class ProductController {
         error: {
           code: 'INTERNAL_SERVER_ERROR',
           message: '商品一覧の取得に失敗しました'
+        }
+      });
+    }
+  }
+
+  /**
+   * 商品新規作成
+   */
+  public async createProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      logger.info(`[PRODUCT_CONTROLLER] 商品作成リクエスト受信`);
+      logger.info(`[PRODUCT_CONTROLLER] リクエストデータ:`, req.body);
+
+      const result = await this.productService.createProduct(req.body);
+
+      const duration = Date.now() - startTime;
+      
+      if (result.success) {
+        logger.info(`[PRODUCT_CONTROLLER] 商品作成完了 (${duration}ms)`);
+        res.status(201).json(result);
+      } else {
+        const statusCode = result.error?.code === 'VALIDATION_ERROR' ? 400 : 500;
+        logger.error(`[PRODUCT_CONTROLLER] 商品作成エラー: ${result.error?.message}`);
+        res.status(statusCode).json(result);
+      }
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      logger.error(`[PRODUCT_CONTROLLER] 商品作成エラー (${duration}ms):`, error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: '商品作成に失敗しました'
+        }
+      });
+    }
+  }
+
+  /**
+   * 商品更新
+   */
+  public async updateProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: '商品IDが必要です'
+          }
+        });
+        return;
+      }
+      
+      logger.info(`[PRODUCT_CONTROLLER] 商品更新リクエスト受信: ${id}`);
+      logger.info(`[PRODUCT_CONTROLLER] リクエストデータ:`, req.body);
+
+      const result = await this.productService.updateProduct(id, req.body);
+
+      const duration = Date.now() - startTime;
+      
+      if (result.success) {
+        logger.info(`[PRODUCT_CONTROLLER] 商品更新完了 (${duration}ms)`);
+        res.json(result);
+      } else {
+        const statusCode = result.error?.code === 'PRODUCT_NOT_FOUND' ? 404 : 
+                          result.error?.code === 'VALIDATION_ERROR' ? 400 : 500;
+        logger.error(`[PRODUCT_CONTROLLER] 商品更新エラー: ${result.error?.message}`);
+        res.status(statusCode).json(result);
+      }
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      logger.error(`[PRODUCT_CONTROLLER] 商品更新エラー (${duration}ms):`, error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: '商品更新に失敗しました'
+        }
+      });
+    }
+  }
+
+  /**
+   * 商品削除
+   */
+  public async deleteProduct(req: AuthenticatedRequest, res: Response): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'BAD_REQUEST',
+            message: '商品IDが必要です'
+          }
+        });
+        return;
+      }
+      
+      logger.info(`[PRODUCT_CONTROLLER] 商品削除リクエスト受信: ${id}`);
+
+      const result = await this.productService.deleteProduct(id);
+
+      const duration = Date.now() - startTime;
+      
+      if (result.success) {
+        logger.info(`[PRODUCT_CONTROLLER] 商品削除完了 (${duration}ms)`);
+        res.json(result);
+      } else {
+        const statusCode = result.error?.code === 'PRODUCT_NOT_FOUND' ? 404 : 500;
+        logger.error(`[PRODUCT_CONTROLLER] 商品削除エラー: ${result.error?.message}`);
+        res.status(statusCode).json(result);
+      }
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      logger.error(`[PRODUCT_CONTROLLER] 商品削除エラー (${duration}ms):`, error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: '商品削除に失敗しました'
         }
       });
     }

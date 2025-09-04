@@ -12,7 +12,7 @@ export class AuthRepository {
   private sessionRepo: SessionRepository;
 
   constructor(private db: Pool) {
-    this.userRepo = new UserRepository(db);
+    this.userRepo = new UserRepository();
     this.storeRepo = new StoreRepository(db);
     this.sessionRepo = new SessionRepository(db);
   }

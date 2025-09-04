@@ -40,10 +40,35 @@ import {
   Inventory as InventoryIcon,
   Assignment as AssignmentIcon,
 } from '@mui/icons-material';
-import MockBanner from '@/components/MockBanner';
-import { Frame, StockItem, Product, FrameStatus } from '@/types';
-import { mockInventoryService } from '@/services/mock/inventory.service';
-import { MOCK_FRAME_STATUSES, MOCK_PRODUCT_CATEGORIES } from '@/services/mock/data/inventory.mock';
+import { Frame, StockItem, Product, FrameStatus, ProductCategory } from '@/types';
+import { inventoryService } from '@/services/inventory.service';
+
+// 定数定義
+const FRAME_STATUSES: FrameStatus[] = ['in_stock', 'reserved', 'sold', 'damaged', 'transferred'];
+const PRODUCT_CATEGORIES: ProductCategory[] = ['frame', 'lens', 'contact', 'accessory', 'hearing_aid'];
+
+// ラベル変換ヘルパー
+const getStatusLabel = (status: FrameStatus) => {
+  switch (status) {
+    case 'in_stock': return '在庫';
+    case 'reserved': return '予約中';
+    case 'sold': return '販売済';
+    case 'damaged': return '破損';
+    case 'transferred': return '移動済';
+    default: return status;
+  }
+};
+
+const getCategoryLabel = (category: ProductCategory) => {
+  switch (category) {
+    case 'frame': return 'フレーム';
+    case 'lens': return 'レンズ';
+    case 'contact': return 'コンタクト';
+    case 'accessory': return 'アクセサリー';
+    case 'hearing_aid': return '補聴器';
+    default: return category;
+  }
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -107,9 +132,9 @@ const InventoryPage: React.FC = () => {
     try {
       // @MOCK_TO_API: 在庫データ取得
       const [framesResponse, stockResponse, summaryResponse] = await Promise.all([
-        mockInventoryService.getFrames(),
-        mockInventoryService.getStockItems(),
-        mockInventoryService.getInventorySummary()
+        inventoryService.getFrames(),
+        inventoryService.getStockItems(),
+        inventoryService.getInventorySummary()
       ]);
 
       if (framesResponse.success && framesResponse.data) {
@@ -119,7 +144,15 @@ const InventoryPage: React.FC = () => {
         setStockItems(stockResponse.data);
       }
       if (summaryResponse.success && summaryResponse.data) {
-        setSummary(summaryResponse.data);
+        const data = summaryResponse.data as any;
+        setSummary({
+          totalFrames: data.totalFrames || 0,
+          availableFrames: data.inStockFrames || data.availableFrames || 0,
+          reservedFrames: data.reservedFrames || 0,
+          soldFrames: data.soldFrames || 0,
+          lowStockItems: data.lowStockItems || 0,
+          totalProducts: data.totalProducts || data.outOfStockItems || 0
+        });
       }
     } catch (err: any) {
       setError(err.message || 'データの読み込みに失敗しました。');
@@ -133,8 +166,8 @@ const InventoryPage: React.FC = () => {
     setLoading(true);
     try {
       // @MOCK_TO_API: フレーム検索
-      const response = await mockInventoryService.getFrames({
-        serialNumber: frameSearch,
+      const response = await inventoryService.getFrames({
+        search: frameSearch,
         status: frameStatusFilter || undefined
       });
       
@@ -153,8 +186,7 @@ const InventoryPage: React.FC = () => {
     setLoading(true);
     try {
       // @MOCK_TO_API: 在庫検索
-      const response = await mockInventoryService.getStockItems({
-        category: stockCategoryFilter || undefined,
+      const response = await inventoryService.getStockItems({
         lowStock: showLowStockOnly
       });
       
@@ -182,7 +214,7 @@ const InventoryPage: React.FC = () => {
   const updateFrameStatus = async (serialNumber: string, status: FrameStatus) => {
     try {
       // @MOCK_TO_API: フレームステータス更新
-      const response = await mockInventoryService.updateFrameStatus(serialNumber, status);
+      const response = await inventoryService.updateFrameStatus(serialNumber, status);
       
       if (response.success) {
         await loadInventoryData(); // データ再読み込み
@@ -198,8 +230,11 @@ const InventoryPage: React.FC = () => {
   // 在庫数量更新
   const updateStockQuantity = async (stockItemId: string, quantity: number) => {
     try {
-      // @MOCK_TO_API: 在庫数量更新
-      const response = await mockInventoryService.updateStockQuantity(stockItemId, quantity);
+      // TODO: 実APIでupdateStockQuantityメソッドが実装されたら有効化
+      console.warn('updateStockQuantity not implemented in API yet');
+      throw new Error('在庫数量更新機能は開発中です');
+      /*
+      const response = await inventoryService.updateStockQuantity(stockItemId, quantity);
       
       if (response.success) {
         await loadInventoryData(); // データ再読み込み
@@ -207,6 +242,7 @@ const InventoryPage: React.FC = () => {
       } else {
         throw new Error(response.error?.message || '在庫数量更新に失敗しました。');
       }
+      */
     } catch (err: any) {
       setError(err.message);
     }
@@ -214,14 +250,19 @@ const InventoryPage: React.FC = () => {
 
   // ステータスカラー取得
   const getStatusColor = (status: FrameStatus) => {
-    const statusConfig = MOCK_FRAME_STATUSES.find(s => s.value === status);
-    return statusConfig?.color || 'default';
+    switch (status) {
+      case 'in_stock': return 'success';
+      case 'reserved': return 'warning';
+      case 'sold': return 'info';
+      case 'damaged': return 'error';
+      case 'transferred': return 'secondary';
+      default: return 'default';
+    }
   };
 
   return (
     <Box>
       {/* @MOCK_UI: モック使用バナー */}
-      <MockBanner message="在庫管理機能 - モックデータを使用中" />
 
       <Typography variant="h5" gutterBottom fontWeight="bold">
         在庫管理
@@ -347,9 +388,9 @@ const InventoryPage: React.FC = () => {
                     onChange={(e) => setFrameStatusFilter(e.target.value as FrameStatus)}
                   >
                     <MenuItem value="">すべて</MenuItem>
-                    {MOCK_FRAME_STATUSES.map((status) => (
-                      <MenuItem key={status.value} value={status.value}>
-                        {status.label}
+                    {FRAME_STATUSES.map((status) => (
+                      <MenuItem key={status} value={status}>
+                        {getStatusLabel(status)}
                       </MenuItem>
                     ))}
                   </Select>
@@ -418,7 +459,7 @@ const InventoryPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={MOCK_FRAME_STATUSES.find(s => s.value === frame.status)?.label}
+                          label={getStatusLabel(frame.status)}
                           color={getStatusColor(frame.status) as any}
                           size="small"
                         />
@@ -472,9 +513,9 @@ const InventoryPage: React.FC = () => {
                     onChange={(e) => setStockCategoryFilter(e.target.value)}
                   >
                     <MenuItem value="">すべて</MenuItem>
-                    {MOCK_PRODUCT_CATEGORIES.map((category) => (
-                      <MenuItem key={category.value} value={category.value}>
-                        {category.label}
+                    {PRODUCT_CATEGORIES.map((category) => (
+                      <MenuItem key={category} value={category}>
+                        {getCategoryLabel(category)}
                       </MenuItem>
                     ))}
                   </Select>
@@ -662,9 +703,9 @@ const EditDialog: React.FC<EditDialogProps> = ({
                     label="ステータス"
                     onChange={(e) => setFrameStatus(e.target.value as FrameStatus)}
                   >
-                    {MOCK_FRAME_STATUSES.map((status) => (
-                      <MenuItem key={status.value} value={status.value}>
-                        {status.label}
+                    {FRAME_STATUSES.map((status) => (
+                      <MenuItem key={status} value={status}>
+                        {getStatusLabel(status)}
                       </MenuItem>
                     ))}
                   </Select>

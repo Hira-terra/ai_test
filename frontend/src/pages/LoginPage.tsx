@@ -71,14 +71,9 @@ const LoginPage: React.FC = () => {
       
       // storeServiceテスト
       try {
-        const response = await storeService.getStores();
-        console.log('📡 Store service response:', response);
-        if (response.success && response.data) {
-          console.log('✅ Stores loaded successfully:', response.data);
-          setStores(response.data);
-        } else {
-          console.error('❌ Store response failed:', response);
-        }
+        const stores = await storeService.getAllStores();
+        console.log('✅ Stores loaded successfully:', stores);
+        setStores(stores);
       } catch (error) {
         console.error('❌ 店舗一覧の取得に失敗しました:', error);
       } finally {
@@ -141,7 +136,7 @@ const LoginPage: React.FC = () => {
       admin: {
         user_code: 'admin001',
         password: 'password',
-        store_code: 'STORE001',
+        store_code: 'HQ001',
       },
     };
 

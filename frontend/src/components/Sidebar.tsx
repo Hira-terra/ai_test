@@ -18,6 +18,8 @@ import {
   PointOfSale as CashRegisterIcon,
   Inventory as InventoryIcon,
   BarChart as AnalyticsIcon,
+  ManageAccounts as UserIcon,
+  Store as StoreIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { NavigationItem } from '@/types';
@@ -55,6 +57,24 @@ const navigationItems: NavigationItem[] = [
     path: '/analytics',
     label: '分析・レポート',
     icon: AnalyticsIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
+    path: '/products',
+    label: '商品マスタ管理',
+    icon: InventoryIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
+    path: '/stores',
+    label: '店舗マスタ管理',
+    icon: StoreIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
+    path: '/users',
+    label: '担当者マスタ管理',
+    icon: UserIcon,
     requiredPermissions: ['manager', 'admin'],
   },
 ];

@@ -25,6 +25,27 @@ router.get('/', productController.getProducts.bind(productController));
 router.get('/frames', productController.getAvailableFrames.bind(productController));
 
 /**
+ * @route   POST /api/products
+ * @desc    商品新規作成
+ * @access  Private (認証必要)
+ */
+router.post('/', productController.createProduct.bind(productController));
+
+/**
+ * @route   PUT /api/products/:id
+ * @desc    商品更新
+ * @access  Private (認証必要)
+ */
+router.put('/:id', productController.updateProduct.bind(productController));
+
+/**
+ * @route   DELETE /api/products/:id
+ * @desc    商品削除
+ * @access  Private (認証必要)
+ */
+router.delete('/:id', productController.deleteProduct.bind(productController));
+
+/**
  * @route   GET /api/products/:id
  * @desc    商品詳細取得
  * @access  Private (認証必要)

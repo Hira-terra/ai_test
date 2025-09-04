@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authentication Error Testing</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        button { margin: 5px; padding: 8px 15px; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>認証エラーメッセージテスト</h1>
+    
+    <div class="test-section">
+        <h3>テスト1: 短いパスワード（バリデーションエラー）</h3>
+        <p>期待する結果: "ユーザーコード、パスワード、または店舗の選択を確認してください。"</p>
+        <button onclick="testShortPassword()">テスト実行</button>
+        <div id="test1-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>テスト2: 正しい形式だが間違ったパスワード（認証エラー）</h3>
+        <p>期待する結果: "ユーザーコード、パスワード、または店舗の選択を確認してください。"</p>
+        <button onclick="testWrongPassword()">テスト実行</button>
+        <div id="test2-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>テスト3: 存在しないユーザー（認証エラー）</h3>
+        <p>期待する結果: "ユーザーコード、パスワード、または店舗の選択を確認してください。"</p>
+        <button onclick="testNonexistentUser()">テスト実行</button>
+        <div id="test3-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>テスト4: 短いパスワード（詳細エラーモード - ユーザー管理画面向け）</h3>
+        <p>期待する結果: "パスワードは8文字以上128文字以下で入力してください"</p>
+        <button onclick="testShortPasswordDetailed()">テスト実行</button>
+        <div id="test4-result" class="result"></div>
+    </div>
+
+    <script>
+        async function testAuth(credentials, testName, resultElementId, showDetailedErrors = false) {
+            const resultDiv = document.getElementById(resultElementId);
+            resultDiv.innerHTML = 'テスト実行中...';
+            
+            try {
+                console.log(`=== ${testName} ===`);
+                console.log('Credentials:', credentials);
+                
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(credentials)
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const errorText = await response.text();
+                console.log('Response text:', errorText);
+                
+                let errorData = {};
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch (e) {
+                    console.error('Failed to parse response as JSON');
+                }
+                
+                if (!response.ok) {
+                    // フロントエンドのエラー処理をシミュレート
+                    let userMessage = 'ログインに失敗しました。';
+                    
+                    if (errorData.error) {
+                        if (errorData.error.code === 'VALIDATION_ERROR') {
+                            if (showDetailedErrors) {
+                                // パスワード設定画面など：詳細なバリデーションエラーを表示
+                                if (errorData.error.details && Array.isArray(errorData.error.details)) {
+                                    userMessage = errorData.error.details.join('、');
+                                } else {
+                                    userMessage = errorData.error.message || '入力内容に誤りがあります。';
+                                }
+                            } else {
+                                // ログイン画面：詳細を隠してユーザーフレンドリーなメッセージ
+                                userMessage = 'ユーザーコード、パスワード、または店舗の選択を確認してください。';
+                            }
+                        } else if (errorData.error.code === 'AUTHENTICATION_FAILED') {
+                            userMessage = 'ユーザーコード、パスワード、または店舗の選択を確認してください。';
+                        } else if (errorData.error.code === 'RATE_LIMIT_EXCEEDED') {
+                            const retryAfter = errorData.error.details?.retryAfter || 60;
+                            userMessage = \`ログイン試行回数が上限に達しました。\${retryAfter}秒後に再試行してください。\`;
+                        } else {
+                            userMessage = errorData.error.message || userMessage;
+                        }
+                    }
+                    
+                    resultDiv.innerHTML = \`
+                        <div class="error">
+                            <strong>エラー (HTTP \${response.status}):</strong><br>
+                            <strong>表示メッセージ:</strong> \${userMessage}<br>
+                            <strong>元のエラー:</strong> \${errorData.error?.message || 'なし'}<br>
+                            <strong>エラーコード:</strong> \${errorData.error?.code || 'なし'}
+                        </div>
+                    \`;
+                } else {
+                    resultDiv.innerHTML = \`
+                        <div class="success">
+                            <strong>成功:</strong> ログインが成功しました
+                        </div>
+                    \`;
+                }
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                resultDiv.innerHTML = \`
+                    <div class="error">
+                        <strong>テストエラー:</strong> \${error.message}
+                    </div>
+                \`;
+            }
+        }
+        
+        async function testShortPassword() {
+            await testAuth({
+                user_code: 'user001',
+                password: '123',
+                store_code: 'STORE001'
+            }, 'Short Password Test', 'test1-result');
+        }
+        
+        async function testWrongPassword() {
+            await testAuth({
+                user_code: 'user001',
+                password: 'wrongpass',
+                store_code: 'STORE001'
+            }, 'Wrong Password Test', 'test2-result');
+        }
+        
+        async function testNonexistentUser() {
+            await testAuth({
+                user_code: 'nonexistent',
+                password: 'password123',
+                store_code: 'STORE001'
+            }, 'Nonexistent User Test', 'test3-result');
+        }
+        
+        async function testShortPasswordDetailed() {
+            await testAuth({
+                user_code: 'user001',
+                password: '123',
+                store_code: 'STORE001'
+            }, 'Short Password Test (Detailed)', 'test4-result', true);
+        }
+    </script>
+</body>
+</html>

@@ -43,7 +43,6 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon,
 } from '@mui/icons-material';
-import MockBanner from '@/components/MockBanner';
 import { 
   Product, 
   Frame, 
@@ -299,6 +298,7 @@ const OrderEntryPage: React.FC = () => {
           frameId: item.frameId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          totalPrice: item.unitPrice * item.quantity,
           prescriptionId: item.prescriptionId,
           notes: item.notes
         })),
@@ -339,7 +339,6 @@ const OrderEntryPage: React.FC = () => {
   return (
     <Box>
       {/* @MOCK_UI: モック使用バナー */}
-      <MockBanner message="受注入力機能 - モックデータを使用中" />
 
       <Typography variant="h5" gutterBottom fontWeight="bold">
         受注入力

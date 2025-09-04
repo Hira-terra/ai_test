@@ -41,10 +41,10 @@ import {
   Search as SearchIcon,
   Add as AddIcon,
   Receipt as ReceiptIcon,
+  Payment as PaymentIcon,
 } from '@mui/icons-material';
-import MockBanner from '@/components/MockBanner';
 import { Order, OrderStatus, PaymentMethod, PaginationInfo } from '@/types';
-import { mockOrderService } from '@/services/mock/order.service';
+import { orderService } from '@/services/order.service';
 
 const OrderListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -72,6 +72,13 @@ const OrderListPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailDialog, setDetailDialog] = useState(false);
+  
+  // 入金追加ダイアログ状態
+  const [paymentDialog, setPaymentDialog] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   // 初期化
   useEffect(() => {
@@ -85,14 +92,13 @@ const OrderListPage: React.FC = () => {
     
     try {
       // @MOCK_TO_API: 受注一覧取得
-      const response = await mockOrderService.getOrders({
+      const response = await orderService.getOrders({
         page: pagination.page,
         limit: pagination.limit,
         status: statusFilter || undefined,
-        paymentMethod: paymentFilter || undefined,
         search: searchQuery || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        fromDate: dateFrom || undefined,
+        toDate: dateTo || undefined,
       });
       
       if (response.success && response.data) {
@@ -127,7 +133,7 @@ const OrderListPage: React.FC = () => {
   const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
     try {
       // @MOCK_TO_API: 受注ステータス更新
-      const response = await mockOrderService.updateOrderStatus(orderId, status);
+      const response = await orderService.updateOrder(orderId, { status });
       
       if (response.success) {
         await loadOrders(); // データ再読み込み
@@ -178,10 +184,65 @@ const OrderListPage: React.FC = () => {
     }).format(amount);
   };
 
+  // 入金追加処理
+  const handleAddPayment = async () => {
+    if (!selectedOrder) return;
+    
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setError('正しい金額を入力してください。');
+      return;
+    }
+    
+    if (amount > selectedOrder.balanceAmount) {
+      setError('入金額が残金を超えています。');
+      return;
+    }
+    
+    setPaymentLoading(true);
+    setError(null);
+    
+    try {
+      const result = await orderService.addPayment(selectedOrder.id, {
+        paymentAmount: amount,
+        paymentMethod,
+        notes: paymentNotes
+      });
+      
+      if (result.success) {
+        // 受注詳細を再取得して入金額を更新
+        const orderResult = await orderService.getOrderById(selectedOrder.id);
+        if (orderResult.success) {
+          setSelectedOrder(orderResult.data!);
+          // 受注一覧も再読み込み
+          loadOrders();
+        }
+        
+        // ダイアログを閉じてフォームをリセット
+        setPaymentDialog(false);
+        setPaymentAmount('');
+        setPaymentNotes('');
+      } else {
+        setError(result.error?.message || '入金の追加に失敗しました。');
+      }
+    } catch (err: any) {
+      setError(err.message || '入金の追加中にエラーが発生しました。');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  // 入金追加ダイアログを開く
+  const handleOpenPaymentDialog = () => {
+    setPaymentAmount('');
+    setPaymentNotes('');
+    setError(null);
+    setPaymentDialog(true);
+  };
+
   return (
     <Box>
       {/* @MOCK_UI: モック使用バナー */}
-      <MockBanner message="受注管理機能 - モックデータを使用中" />
       
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">
@@ -303,6 +364,7 @@ const OrderListPage: React.FC = () => {
                   <TableCell>受注番号</TableCell>
                   <TableCell>受注日</TableCell>
                   <TableCell>顧客名</TableCell>
+                  <TableCell>担当者</TableCell>
                   <TableCell>商品数</TableCell>
                   <TableCell align="right">金額</TableCell>
                   <TableCell align="right">入金額</TableCell>
@@ -331,6 +393,16 @@ const OrderListPage: React.FC = () => {
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {order.customer?.customerCode}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2">
+                          {order.createdByUser?.name || '-'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {order.createdByUser?.userCode || '-'}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -455,6 +527,7 @@ const OrderListPage: React.FC = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography><strong>顧客名:</strong> {selectedOrder.customer?.fullName}</Typography>
+                    <Typography><strong>担当者:</strong> {selectedOrder.createdByUser?.name || '-'}</Typography>
                     <Typography><strong>支払方法:</strong> {getPaymentMethodLabel(selectedOrder.paymentMethod)}</Typography>
                     <Typography><strong>店舗:</strong> {selectedOrder.store?.name}</Typography>
                   </Grid>
@@ -487,7 +560,19 @@ const OrderListPage: React.FC = () => {
               
               {/* 金額情報 */}
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>金額情報</Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6" gutterBottom>金額情報</Typography>
+                  {selectedOrder.balanceAmount > 0 && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<PaymentIcon />}
+                      onClick={handleOpenPaymentDialog}
+                    >
+                      入金追加
+                    </Button>
+                  )}
+                </Box>
                 <Box>
                   <Typography>小計: {formatCurrency(selectedOrder.subtotalAmount)}</Typography>
                   <Typography>消費税: {formatCurrency(selectedOrder.taxAmount)}</Typography>
@@ -513,6 +598,81 @@ const OrderListPage: React.FC = () => {
           <Button onClick={() => setDetailDialog(false)}>閉じる</Button>
           <Button variant="contained" startIcon={<ReceiptIcon />}>
             領収書印刷
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 入金追加ダイアログ */}
+      <Dialog open={paymentDialog} onClose={() => setPaymentDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>入金追加</DialogTitle>
+        <DialogContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          
+          {selectedOrder && (
+            <Box mb={2}>
+              <Typography variant="body2" color="text.secondary">
+                受注番号: {selectedOrder.orderNumber}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                残金: {formatCurrency(selectedOrder.balanceAmount)}
+              </Typography>
+            </Box>
+          )}
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                label="入金額"
+                type="number"
+                fullWidth
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                InputProps={{
+                  startAdornment: <Typography sx={{ mr: 1 }}>¥</Typography>,
+                }}
+                helperText={selectedOrder ? `残金: ${formatCurrency(selectedOrder.balanceAmount)}` : ''}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>支払方法</InputLabel>
+                <Select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                  label="支払方法"
+                >
+                  <MenuItem value="cash">現金</MenuItem>
+                  <MenuItem value="credit">クレジットカード</MenuItem>
+                  <MenuItem value="electronic">電子マネー</MenuItem>
+                  <MenuItem value="receivable">売掛</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                label="備考"
+                multiline
+                rows={3}
+                fullWidth
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="入金に関するメモがあれば記入してください"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPaymentDialog(false)} disabled={paymentLoading}>
+            キャンセル
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleAddPayment}
+            disabled={paymentLoading || !paymentAmount}
+          >
+            {paymentLoading ? '処理中...' : '入金追加'}
           </Button>
         </DialogActions>
       </Dialog>

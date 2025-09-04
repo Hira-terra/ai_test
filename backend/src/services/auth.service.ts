@@ -85,7 +85,7 @@ export class AuthService {
       const { user, store } = userData;
 
       // パスワード検証
-      const isValidPassword = await authUtils.verifyPassword(password, user.password);
+      const isValidPassword = await authUtils.verifyPassword(password, user.password_hash);
       if (!isValidPassword) {
         await this.authRepo.recordLoginAttempt(
           user_code,

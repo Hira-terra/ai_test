@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Debug Tool</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Authentication Debug Tool</h1>
+    <button onclick="debugLogin()">Test Login API</button>
+    <div id="result"></div>
+
+    <script>
+        async function debugLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                console.log('=== Auth Debug Test Started ===');
+                
+                // Test 1: Environment check
+                console.log('Current origin:', window.location.origin);
+                console.log('API Base URL should be: http://localhost:3001/api');
+                
+                // Test 2: Direct API call
+                const apiUrl = 'http://localhost:3001/api/auth/login';
+                const credentials = {
+                    user_code: 'manager001',
+                    password: 'password', 
+                    store_code: 'STORE001'
+                };
+                
+                console.log('Testing direct API call to:', apiUrl);
+                console.log('With credentials:', credentials);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(credentials)
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const result = await response.json();
+                console.log('Success response:', result);
+                
+                resultDiv.innerHTML = `
+                    <h3>Success!</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Auth test failed:', error);
+                resultDiv.innerHTML = `
+                    <h3 style="color: red;">Failed!</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>Check browser console for details</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -16,20 +16,21 @@ class RateLimiter {
   constructor() {
     const useRedis = redis.isReady();
     
-    // ログイン試行制限（15分間に5回まで）
+    // ログイン試行制限（開発環境: 5分間に10回、本番環境: 15分間に5回まで）
+    const isDevelopment = config.env === 'development';
     this.loginLimiter = useRedis
       ? new RateLimiterRedis({
           storeClient: redis as any,
           keyPrefix: 'login_limit',
-          points: 5, // 試行回数
-          duration: 900, // 15分（秒）
-          blockDuration: 900, // ブロック時間（秒）
+          points: isDevelopment ? 10 : 5, // 試行回数
+          duration: isDevelopment ? 300 : 900, // 開発環境: 5分、本番環境: 15分（秒）
+          blockDuration: isDevelopment ? 300 : 900, // ブロック時間（秒）
         })
       : new RateLimiterMemory({
           keyPrefix: 'login_limit',
-          points: 5,
-          duration: 900,
-          blockDuration: 900,
+          points: isDevelopment ? 10 : 5,
+          duration: isDevelopment ? 300 : 900,
+          blockDuration: isDevelopment ? 300 : 900,
         });
 
     // 一般API制限（15分間に100回まで）

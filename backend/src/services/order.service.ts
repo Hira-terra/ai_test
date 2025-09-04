@@ -166,6 +166,7 @@ export class OrderService {
       }>;
       deliveryDate?: string;
       paymentMethod: PaymentMethod;
+      paidAmount?: number;
       notes?: string;
     },
     storeId: string,
@@ -212,6 +213,7 @@ export class OrderService {
       const orderNumber = `${dateStr}-${randomNum}`;
 
       // 受注作成データ準備
+      const paidAmount = orderData.paidAmount || 0;
       const createData = {
         orderNumber,
         customerId: orderData.customerId,
@@ -220,11 +222,14 @@ export class OrderService {
         subtotalAmount,
         taxAmount,
         totalAmount,
-        paidAmount: 0, // 初期は未入金
+        paidAmount: paidAmount,
         paymentMethod: orderData.paymentMethod,
         notes: orderData.notes,
         createdBy,
-        items: orderData.items
+        items: orderData.items.map(item => ({
+          ...item,
+          totalPrice: item.quantity * item.unitPrice
+        }))
       };
 
       const order = await this.orderRepo.createOrder(createData);
@@ -234,6 +239,7 @@ export class OrderService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount,
+        paidAmount,
         duration: `${duration}ms`
       });
 

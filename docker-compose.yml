@@ -9,13 +9,14 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-glasses_store_db}
       POSTGRES_USER: ${POSTGRES_USER:-glasses_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-glasses_pass}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
-      - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+      - postgres_data:/var/lib/postgresql
+      # 初期化スクリプトは既存データがある場合は実行されない
+      # - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      # - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
     ports:
       - "${DB_PORT:-5432}:5432"
     networks:
@@ -44,6 +45,34 @@ services:
       timeout: 5s
       retries: 3
 
+  # pgAdmin - PostgreSQL管理UI
+  pgadmin:
+    image: dpage/pgadmin4:8.0
+    container_name: glasses_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@glasses.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/var/lib/pgadmin/pgpass:ro
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   # バックエンド API サーバー
   backend:
     build:
@@ -60,7 +89,7 @@ services:
       DB_PORT: 5432
       DB_NAME: ${POSTGRES_DB:-glasses_store_db}
       DB_USER: ${POSTGRES_USER:-glasses_user}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme_postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-glasses_pass}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # REDIS_PASSWORD:
@@ -153,13 +182,21 @@ networks:
 
 volumes:
   postgres_data:
-    driver: local
+    external: true
+    name: glasses_store_postgres_data
   
   redis_data:
-    driver: local
+    external: true
+    name: glasses_store_redis_data
   
   backend_node_modules:
-    driver: local
+    external: true
+    name: glasses_store_backend_node_modules
   
   frontend_node_modules:
-    driver: local
+    external: true
+    name: glasses_store_frontend_node_modules
+  
+  pgadmin_data:
+    external: true
+    name: glasses_store_pgadmin_data
