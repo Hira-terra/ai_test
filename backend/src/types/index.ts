@@ -125,6 +125,40 @@ export const API_ENDPOINTS = {
   // ファイルアップロード
   UPLOAD: {
     IMAGE: '/upload/image'
+  },
+  
+  // 発注管理
+  PURCHASE_ORDERS: {
+    BASE: '/purchase-orders',
+    LIST: '/purchase-orders',
+    DETAIL: (id: string) => `/purchase-orders/${id}`,
+    CREATE: '/purchase-orders',
+    UPDATE: (id: string) => `/purchase-orders/${id}`,
+    SEND: (id: string) => `/purchase-orders/${id}/send`,
+    CONFIRM: (id: string) => `/purchase-orders/${id}/confirm`,
+    CANCEL: (id: string) => `/purchase-orders/${id}/cancel`,
+    
+    // 発注可能受注取得
+    AVAILABLE_ORDERS: '/purchase-orders/available-orders',
+    
+    // 仕入先管理
+    SUPPLIERS: '/purchase-orders/suppliers'
+  },
+  
+  // 入庫管理
+  RECEIVING: {
+    BASE: '/receiving',
+    LIST: '/receiving',
+    DETAIL: (id: string) => `/receiving/${id}`,
+    CREATE: '/receiving',
+    UPDATE: (id: string) => `/receiving/${id}`,
+    COMPLETE: (id: string) => `/receiving/${id}/complete`,
+    
+    // 入荷予定
+    EXPECTED: '/receiving/expected',
+    
+    // 品質チェック
+    QUALITY_CHECK: (id: string) => `/receiving/${id}/quality-check`
   }
 } as const;
 
@@ -393,8 +427,21 @@ export interface Order {
   updatedAt: DateString;
 }
 
-export type OrderStatus = 'ordered' | 'in_production' | 'ready' | 'delivered' | 'cancelled';
+// 実際の業務フローに合わせた拡張ステータス
+export type OrderStatus = 
+  | 'ordered'           // 受注済み
+  | 'prescription_done' // 処方箋作成完了
+  | 'purchase_ordered'  // レンズ発注済み
+  | 'lens_received'     // レンズ入庫済み
+  | 'in_production'     // 製作中
+  | 'ready'            // 完成・お渡し準備完了
+  | 'delivered'        // お渡し完了
+  | 'cancelled';       // キャンセル
+
 export type PaymentMethod = 'cash' | 'credit' | 'electronic' | 'receivable';
+
+// 支払タイミングの追加
+export type PaymentTiming = 'order_time' | 'delivery_time';
 
 export interface OrderItem {
   id: UUID;
@@ -417,9 +464,132 @@ export interface Payment {
   paymentDate: DateString;
   paymentAmount: number;
   paymentMethod: PaymentMethod;
+  paymentTiming: PaymentTiming; // 受注時 or お渡し時
   notes?: string;
   createdBy: UUID;
   createdAt: DateString;
+}
+
+// =================================================================
+// 発注管理関連型
+// =================================================================
+
+export interface Supplier {
+  id: UUID;
+  supplierCode: string;
+  name: string;
+  contactInfo?: string;
+  orderMethod: 'edi' | 'csv' | 'fax' | 'email'; // 発注方式
+  isActive: boolean;
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export interface PurchaseOrder {
+  id: UUID;
+  purchaseOrderNumber: string;
+  supplierId: UUID;
+  supplier?: Supplier;
+  storeId: UUID;
+  store?: Store;
+  orderDate: DateString;
+  expectedDeliveryDate?: DateString;
+  actualDeliveryDate?: DateString;
+  status: PurchaseOrderStatus;
+  subtotalAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  items: PurchaseOrderItem[];
+  notes?: string;
+  sentAt?: DateString; // 発注送信日時
+  confirmedAt?: DateString; // メーカー確認日時
+  createdBy: UUID;
+  createdByUser?: User;
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'confirmed' | 'partially_delivered' | 'delivered' | 'cancelled';
+
+export interface PurchaseOrderItem {
+  id: UUID;
+  purchaseOrderId: UUID;
+  orderId: UUID; // 元受注ID
+  order?: Order;
+  productId: UUID;
+  product?: Product;
+  prescriptionId?: UUID;
+  prescription?: Prescription;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  specifications?: string; // 度数等の仕様詳細
+  notes?: string;
+}
+
+export interface CreatePurchaseOrderRequest {
+  supplierId: UUID;
+  expectedDeliveryDate?: DateString;
+  orderIds: UUID[]; // 対象受注ID群
+  notes?: string;
+}
+
+export interface PurchaseOrderSearchParams {
+  supplierId?: UUID;
+  status?: PurchaseOrderStatus;
+  orderDateFrom?: DateString;
+  orderDateTo?: DateString;
+  expectedDeliveryFrom?: DateString;
+  expectedDeliveryTo?: DateString;
+  page?: number;
+  limit?: number;
+  sort?: string;
+}
+
+// =================================================================
+// 入庫管理関連型
+// =================================================================
+
+export interface Receiving {
+  id: UUID;
+  receivingNumber: string;
+  purchaseOrderId: UUID;
+  purchaseOrder?: PurchaseOrder;
+  receivedDate: DateString;
+  receivedBy: UUID;
+  receivedByUser?: User;
+  status: ReceivingStatus;
+  items: ReceivingItem[];
+  notes?: string;
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export type ReceivingStatus = 'partial' | 'complete' | 'with_issues';
+
+export interface ReceivingItem {
+  id: UUID;
+  receivingId: UUID;
+  purchaseOrderItemId: UUID;
+  purchaseOrderItem?: PurchaseOrderItem;
+  expectedQuantity: number;
+  receivedQuantity: number;
+  qualityStatus: 'good' | 'damaged' | 'defective' | 'incorrect_spec';
+  actualCost?: number; // 実際の仕入価格（請求書ベース）
+  notes?: string;
+}
+
+export interface CreateReceivingRequest {
+  purchaseOrderId: UUID;
+  receivedDate: DateString;
+  items: {
+    purchaseOrderItemId: UUID;
+    receivedQuantity: number;
+    qualityStatus: 'good' | 'damaged' | 'defective' | 'incorrect_spec';
+    actualCost?: number;
+    notes?: string;
+  }[];
+  notes?: string;
 }
 
 // =================================================================
@@ -567,3 +737,46 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
   | 'SERVER_ERROR';
+
+// =================================================================
+// エラークラス
+// =================================================================
+export class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly details: any[] = []
+  ) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NotFoundError extends Error {
+  constructor(
+    message: string,
+    public readonly details: any[] = []
+  ) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class AuthenticationError extends Error {
+  constructor(
+    message: string,
+    public readonly details: any[] = []
+  ) {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+
+export class AuthorizationError extends Error {
+  constructor(
+    message: string,
+    public readonly details: any[] = []
+  ) {
+    super(message);
+    this.name = 'AuthorizationError';
+  }
+}

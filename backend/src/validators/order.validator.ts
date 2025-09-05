@@ -13,7 +13,7 @@ export class ValidationError extends Error {
 }
 
 // 受注ステータスの値
-const orderStatuses: OrderStatus[] = ['ordered', 'in_production', 'ready', 'delivered', 'cancelled'];
+const orderStatuses: OrderStatus[] = ['ordered', 'prescription_done', 'purchase_ordered', 'lens_received', 'in_production', 'ready', 'delivered', 'cancelled'];
 const paymentMethods: PaymentMethod[] = ['cash', 'credit', 'electronic', 'receivable'];
 
 // 受注作成バリデーション
@@ -155,6 +155,13 @@ export const orderCreateSchema = Joi.object({
     .messages({
       'any.only': '支払方法が正しくありません。',
       'any.required': '支払方法は必須です。'
+    }),
+  
+  status: Joi.string()
+    .valid(...orderStatuses)
+    .optional()
+    .messages({
+      'any.only': '受注ステータスが正しくありません。'
     }),
   
   notes: Joi.string()

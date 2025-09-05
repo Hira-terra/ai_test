@@ -94,10 +94,8 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.get(API_ENDPOINTS.STORES.LIST);
-      return {
-        success: true,
-        data: response.data
-      };
+      // responseは既に { success: true, data: [...] } 形式
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗一覧の取得に失敗しました。');
     }
@@ -109,10 +107,7 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.get(API_ENDPOINTS.STORES.DETAIL(id));
-      return {
-        success: true,
-        data: response.data
-      };
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗が見つかりません。');
     }
@@ -124,10 +119,7 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.post(API_ENDPOINTS.STORES.BASE, data);
-      return {
-        success: true,
-        data: response.data
-      };
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗の作成に失敗しました。');
     }
@@ -139,10 +131,7 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.put(API_ENDPOINTS.STORES.DETAIL(id), data);
-      return {
-        success: true,
-        data: response.data
-      };
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗の更新に失敗しました。');
     }
@@ -154,10 +143,7 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.delete(API_ENDPOINTS.STORES.DETAIL(id));
-      return {
-        success: true,
-        data: response.data
-      };
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗の削除に失敗しました。');
     }
@@ -169,10 +155,7 @@ export const apiStoreService = {
     
     try {
       const response = await apiClient.get(`${API_ENDPOINTS.STORES.DETAIL(id)}/statistics`);
-      return {
-        success: true,
-        data: response.data
-      };
+      return response;
     } catch (error: any) {
       throw new Error(error.message || '店舗統計の取得に失敗しました。');
     }

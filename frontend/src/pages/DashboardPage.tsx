@@ -31,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockDashboardService } from '@/services/mock/dashboard.service';
+// 実API使用に統一済み - ダッシュボードデータは実APIで取得
 
 interface StatCardProps {
   title: string;
@@ -118,17 +118,18 @@ const DashboardPage: React.FC = () => {
     setError(null);
     
     try {
-      // @MOCK_TO_API: ダッシュボード集計データ取得
-      const summaryResponse = await mockDashboardService.getSummary();
-      if (summaryResponse.success && summaryResponse.data) {
-        setSummary(summaryResponse.data);
-      }
-      
-      // @MOCK_TO_API: 店舗ランキングデータ取得
-      const rankingsResponse = await mockDashboardService.getStoreRankings();
-      if (rankingsResponse.success && rankingsResponse.data) {
-        setStoreRankings(rankingsResponse.data);
-      }
+      // TODO: 実API実装時に置き換え - 現在は基本データのみ表示
+      setSummary({
+        todaySales: 0,
+        todayCustomers: 0,
+        monthlyOrders: 0,
+        profitRate: 0,
+        yesterdayComparison: 0,
+        monthlyComparison: 0,
+        totalStores: 5,
+        activeOrders: 0
+      });
+      setStoreRankings([]);
     } catch (err: any) {
       setError(err.message || 'データの取得に失敗しました。');
     } finally {

@@ -28,9 +28,9 @@ import {
   LocationOn as LocationIcon,
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
-import { CreateCustomerRequest } from '@/types';
+import { CreateCustomerRequest, Store } from '@/types';
 import { customerService } from '@/services/customer.service';
-import { MOCK_STORES_DATA } from '@/services/mock/data/store.mock';
+import { storeService } from '@/services/store.service';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CustomerFormData {
@@ -70,9 +70,15 @@ const CustomerCreatePage: React.FC = () => {
     registeredStoreId: user?.store?.id, // デフォルトは現在ユーザーの店舗
   });
   
+  const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // 店舗データを取得
+  useEffect(() => {
+    fetchStoresData();
+  }, []);
 
   // 編集モードの場合、顧客データを取得
   useEffect(() => {
@@ -80,6 +86,15 @@ const CustomerCreatePage: React.FC = () => {
       fetchCustomerData(id);
     }
   }, [isEditMode, id]);
+
+  const fetchStoresData = async () => {
+    try {
+      const storesData = await storeService.getAllStores();
+      setStores(storesData);
+    } catch (error) {
+      console.error('店舗データ取得エラー:', error);
+    }
+  };
 
   const fetchCustomerData = async (customerId: string) => {
     setIsLoading(true);
@@ -351,7 +366,7 @@ const CustomerCreatePage: React.FC = () => {
                       onChange={handleInputChange('registeredStoreId')}
                       label="登録店舗"
                     >
-                      {MOCK_STORES_DATA.map((store) => (
+                      {stores.map((store) => (
                         <MenuItem key={store.id} value={store.id}>
                           {store.name} ({store.storeCode})
                         </MenuItem>

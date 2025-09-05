@@ -17,7 +17,7 @@ import {
   User
 } from '../types';
 
-export interface OrderModel {
+export interface OrderModelData {
   id: UUID;
   order_number: string;
   customer_id: UUID;
@@ -37,7 +37,7 @@ export interface OrderModel {
   updated_at: DateString;
 }
 
-export interface OrderItemModel {
+export interface OrderItemModelData {
   id: UUID;
   order_id: UUID;
   product_id: UUID;
@@ -49,12 +49,310 @@ export interface OrderItemModel {
   notes?: string;
 }
 
+export class OrderModel {
+  constructor(private pool: Pool) {}
+
+  /**
+   * 発注待ち受注を取得
+   * A. レンズ商品: 処方箋作成済み、かつ未発注
+   * B. フレーム等: 受注済み、在庫不足、かつ未発注
+   */
+  async findAvailableForPurchase(params?: {
+    storeId?: string;
+    customerId?: string;
+    customerName?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<Order[]> {
+    console.log('🔍 [ORDER_MODEL] Received params:', params);
+    let whereConditions: string[] = [
+      `(
+        (o.status = 'prescription_done' AND EXISTS (
+          SELECT 1 FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = o.id 
+          AND p.category = 'lens'
+          AND NOT EXISTS (
+            SELECT 1 FROM purchase_order_items poi
+            WHERE poi.order_id = o.id AND poi.product_id = p.id
+          )
+        ))
+        OR
+        (o.status IN ('ordered', 'prescription_done') AND EXISTS (
+          SELECT 1 FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          LEFT JOIN frames f ON oi.frame_id = f.id
+          WHERE oi.order_id = o.id 
+          AND p.category IN ('frame', 'contact', 'accessory')
+          AND (
+            (p.category = 'frame' AND f.id IS NOT NULL AND f.status != 'in_stock')
+            OR
+            (p.category IN ('contact', 'accessory'))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM purchase_order_items poi
+            WHERE poi.order_id = o.id AND poi.product_id = p.id
+          )
+        ))
+      )`
+    ];
+    
+    let queryParams: any[] = [];
+    let paramCount = 1;
+
+    if (params?.storeId) {
+      whereConditions.push(`o.store_id = $${paramCount++}`);
+      queryParams.push(params.storeId);
+    }
+    if (params?.customerId) {
+      // UUIDフォーマットチェック
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(params.customerId)) {
+        whereConditions.push(`o.customer_id = $${paramCount++}`);
+        queryParams.push(params.customerId);
+      }
+    }
+    if (params?.customerName) {
+      whereConditions.push(`(CONCAT(c.last_name, ' ', c.first_name) LIKE $${paramCount++} OR CONCAT(c.last_name, c.first_name) LIKE $${paramCount++})`);
+      queryParams.push(`%${params.customerName}%`);
+      queryParams.push(`%${params.customerName}%`);
+    }
+    if (params?.fromDate) {
+      whereConditions.push(`o.order_date >= $${paramCount++}`);
+      queryParams.push(params.fromDate);
+    }
+    if (params?.toDate) {
+      whereConditions.push(`o.order_date <= $${paramCount++}`);
+      queryParams.push(params.toDate);
+    }
+
+    console.log('🔍 [ORDER_MODEL] Search conditions:', whereConditions);
+    console.log('🔍 [ORDER_MODEL] Query parameters:', queryParams);
+
+    const query = `
+      SELECT 
+        o.id,
+        o.order_number as "orderNumber",
+        o.customer_id as "customerId",
+        o.store_id as "storeId",
+        o.order_date as "orderDate",
+        o.delivery_date as "deliveryDate",
+        o.status,
+        o.subtotal_amount as "subtotalAmount",
+        o.tax_amount as "taxAmount",
+        o.total_amount as "totalAmount",
+        o.paid_amount as "paidAmount",
+        o.balance_amount as "balanceAmount",
+        o.payment_method as "paymentMethod",
+        o.notes,
+        o.created_by as "createdBy",
+        o.created_at as "createdAt",
+        o.updated_at as "updatedAt",
+        -- 顧客情報
+        c.id as "customer.id",
+        c.customer_code as "customer.customerCode",
+        c.last_name as "customer.lastName",
+        c.first_name as "customer.firstName",
+        CONCAT(c.last_name, ' ', c.first_name) as "customer.fullName",
+        c.phone as "customer.phone",
+        -- 店舗情報
+        s.id as "store.id",
+        s.store_code as "store.storeCode",
+        s.name as "store.name"
+      FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN stores s ON o.store_id = s.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY o.order_date DESC
+    `;
+
+    const result = await this.pool.query(query, queryParams);
+    
+    // 各受注の商品情報も取得
+    const orders = [];
+    for (const row of result.rows) {
+      const items = await this.getOrderItemsWithLens(row.id);
+      const order = this.transformRow(row);
+      order.items = items;
+      orders.push(order);
+    }
+
+    return orders;
+  }
+
+  /**
+   * レンズ商品を含む受注明細を取得
+   */
+  private async getOrderItemsWithLens(orderId: string): Promise<OrderItem[]> {
+    const query = `
+      SELECT 
+        oi.id,
+        oi.order_id as "orderId",
+        oi.product_id as "productId",
+        oi.frame_id as "frameId",
+        oi.quantity,
+        oi.unit_price as "unitPrice",
+        oi.total_price as "totalPrice",
+        oi.prescription_id as "prescriptionId",
+        oi.notes,
+        -- 商品情報
+        p.id as "product.id",
+        p.product_code as "product.productCode",
+        p.name as "product.name",
+        p.brand as "product.brand",
+        p.category as "product.category",
+        p.retail_price as "product.retailPrice",
+        p.cost_price as "product.costPrice",
+        -- 処方箋情報
+        pr.id as "prescription.id",
+        pr.measured_date as "prescription.measuredDate",
+        pr.right_eye_sphere as "prescription.rightEyeSphere",
+        pr.right_eye_cylinder as "prescription.rightEyeCylinder",
+        pr.right_eye_axis as "prescription.rightEyeAxis",
+        pr.left_eye_sphere as "prescription.leftEyeSphere",
+        pr.left_eye_cylinder as "prescription.leftEyeCylinder",
+        pr.left_eye_axis as "prescription.leftEyeAxis",
+        pr.pupil_distance as "prescription.pupilDistance"
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN prescriptions pr ON oi.prescription_id = pr.id
+      WHERE oi.order_id = $1 AND p.category = 'lens'
+      ORDER BY oi.created_at
+    `;
+
+    const result = await this.pool.query(query, [orderId]);
+    return result.rows.map(row => this.transformItemRow(row));
+  }
+
+  /**
+   * 受注のステータスを更新
+   */
+  async updateStatus(orderId: string, status: OrderStatus): Promise<boolean> {
+    const query = `
+      UPDATE orders 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `;
+    
+    const result = await this.pool.query(query, [status, orderId]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * 複数受注のステータスを一括更新
+   */
+  async updateMultipleStatus(orderIds: string[], status: OrderStatus): Promise<number> {
+    const query = `
+      UPDATE orders 
+      SET status = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ANY($2)
+    `;
+    
+    const result = await this.pool.query(query, [status, orderIds]);
+    return result.rowCount ?? 0;
+  }
+
+  /**
+   * 行データの変換
+   */
+  private transformRow(row: any): Order {
+    return {
+      id: row.id,
+      orderNumber: row.orderNumber,
+      customerId: row.customerId,
+      customer: row['customer.id'] ? {
+        id: row['customer.id'],
+        customerCode: row['customer.customerCode'],
+        lastName: row['customer.lastName'],
+        firstName: row['customer.firstName'],
+        fullName: row['customer.fullName'],
+        fullNameKana: '',
+        gender: undefined,
+        phone: row['customer.phone'],
+        visitCount: 0,
+        totalPurchaseAmount: 0,
+        registeredStoreId: '',
+        createdAt: '',
+        updatedAt: ''
+      } : undefined,
+      storeId: row.storeId,
+      store: row['store.id'] ? {
+        id: row['store.id'],
+        storeCode: row['store.storeCode'],
+        name: row['store.name'],
+        address: '',
+        createdAt: '',
+        updatedAt: ''
+      } : undefined,
+      orderDate: row.orderDate,
+      deliveryDate: row.deliveryDate,
+      status: row.status,
+      subtotalAmount: parseFloat(row.subtotalAmount || '0'),
+      taxAmount: parseFloat(row.taxAmount || '0'),
+      totalAmount: parseFloat(row.totalAmount || '0'),
+      paidAmount: parseFloat(row.paidAmount || '0'),
+      balanceAmount: parseFloat(row.balanceAmount || '0'),
+      paymentMethod: row.paymentMethod,
+      notes: row.notes,
+      items: [],
+      createdBy: row.createdBy,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
+    };
+  }
+
+  /**
+   * 明細行データの変換
+   */
+  private transformItemRow(row: any): OrderItem {
+    return {
+      id: row.id,
+      orderId: row.orderId,
+      productId: row.productId,
+      product: row['product.id'] ? {
+        id: row['product.id'],
+        productCode: row['product.productCode'],
+        name: row['product.name'],
+        brand: row['product.brand'],
+        category: row['product.category'],
+        retailPrice: parseFloat(row['product.retailPrice'] || '0'),
+        costPrice: parseFloat(row['product.costPrice'] || '0'),
+        managementType: 'individual',
+        isActive: true,
+        createdAt: '',
+        updatedAt: ''
+      } : undefined,
+      frameId: row.frameId,
+      quantity: row.quantity,
+      unitPrice: parseFloat(row.unitPrice || '0'),
+      totalPrice: parseFloat(row.totalPrice || '0'),
+      prescriptionId: row.prescriptionId,
+      prescription: row['prescription.id'] ? {
+        id: row['prescription.id'],
+        customerId: '',
+        measuredDate: row['prescription.measuredDate'],
+        rightEyeSphere: row['prescription.rightEyeSphere'],
+        rightEyeCylinder: row['prescription.rightEyeCylinder'],
+        rightEyeAxis: row['prescription.rightEyeAxis'],
+        leftEyeSphere: row['prescription.leftEyeSphere'],
+        leftEyeCylinder: row['prescription.leftEyeCylinder'],
+        leftEyeAxis: row['prescription.leftEyeAxis'],
+        pupilDistance: row['prescription.pupilDistance'],
+        createdBy: '',
+        createdAt: ''
+      } : undefined,
+      notes: row.notes
+    };
+  }
+}
+
 export interface PaymentModel {
   id: UUID;
   order_id: UUID;
   payment_date: DateString;
   payment_amount: number;
   payment_method: PaymentMethod;
+  payment_timing?: string; // 'order_time' | 'delivery_time'
   notes?: string;
   created_by: UUID;
   created_at: DateString;
@@ -68,7 +366,7 @@ export class OrderRepository {
     logger.info('[OrderRepository] 初期化完了');
   }
 
-  private transformToOrder(row: OrderModel & { 
+  private transformToOrder(row: OrderModelData & { 
     customer_last_name?: string;
     customer_first_name?: string;
     customer_code?: string;
@@ -130,7 +428,7 @@ export class OrderRepository {
     };
   }
 
-  private transformToOrderItem(row: OrderItemModel & {
+  private transformToOrderItem(row: OrderItemModelData & {
     product_name?: string;
     product_code?: string;
     product_brand?: string;
@@ -180,6 +478,7 @@ export class OrderRepository {
       paymentDate: row.payment_date,
       paymentAmount: row.payment_amount,
       paymentMethod: row.payment_method,
+      paymentTiming: (row.payment_timing as 'order_time' | 'delivery_time') || 'order_time',
       notes: row.notes,
       createdBy: row.created_by,
       createdAt: row.created_at
@@ -358,6 +657,7 @@ export class OrderRepository {
     orderNumber: string;
     customerId: string;
     storeId: string;
+    status?: OrderStatus;
     deliveryDate?: string;
     subtotalAmount: number;
     taxAmount: number;
@@ -389,7 +689,7 @@ export class OrderRepository {
           payment_method, notes, created_by
         ) VALUES (
           gen_random_uuid(), $1, $2, $3, NOW(), $4,
-          'ordered', $5, $6, $7, $8, $9, $10, $11
+          $5, $6, $7, $8, $9, $10, $11, $12
         ) RETURNING *
       `;
 
@@ -398,6 +698,7 @@ export class OrderRepository {
         orderData.customerId,
         orderData.storeId,
         orderData.deliveryDate,
+        orderData.status || 'ordered', // フロントエンドから送信されたステータスを使用
         orderData.subtotalAmount,
         orderData.taxAmount,
         orderData.totalAmount,

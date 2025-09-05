@@ -156,6 +156,7 @@ export class OrderService {
   async createOrder(
     orderData: {
       customerId: string;
+      status?: OrderStatus;
       items: Array<{
         productId: string;
         frameId?: string;
@@ -218,6 +219,7 @@ export class OrderService {
         orderNumber,
         customerId: orderData.customerId,
         storeId,
+        status: orderData.status || 'ordered', // フロントエンドから送信されたステータスを使用
         deliveryDate: orderData.deliveryDate,
         subtotalAmount,
         taxAmount,

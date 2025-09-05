@@ -42,6 +42,8 @@ import {
   Download as DownloadIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
+  Cancel as CancelIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { 
   Product, 
@@ -49,7 +51,8 @@ import {
   Customer, 
   Prescription, 
   PaymentMethod,
-  OrderItem 
+  OrderItem,
+  OrderStatus 
 } from '@/types';
 import { customerService } from '@/services/customer.service';
 import { productService } from '@/services/product.service';
@@ -87,6 +90,22 @@ const OrderEntryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrescriptionDialog, setShowPrescriptionDialog] = useState(false);
+  const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
+  
+  // 処方箋入力フォーム状態
+  const [prescriptionForm, setPrescriptionForm] = useState({
+    rightEyeSphere: '',
+    rightEyeCylinder: '',
+    rightEyeAxis: '',
+    rightEyeVision: '',
+    leftEyeSphere: '',
+    leftEyeCylinder: '',
+    leftEyeAxis: '',
+    leftEyeVision: '',
+    pupilDistance: '',
+    measuredDate: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
   
   // 商品選択用の状態
   const [selectedProductCategory, setSelectedProductCategory] = useState<string>('all');
@@ -101,6 +120,53 @@ const OrderEntryPage: React.FC = () => {
     { value: 'hearing_aid', label: '補聴器', icon: '🦻' },
     { value: 'accessory', label: 'アクセサリー', icon: '🎒' },
   ];
+
+  // 処方箋入力用選択肢
+  const prescriptionOptions = {
+    // 球面度数: -20.00 から +20.00 まで 0.25 刻み
+    sphereOptions: (() => {
+      const options = [];
+      for (let i = -2000; i <= 2000; i += 25) {
+        const value = (i / 100).toFixed(2);
+        options.push({ value, label: value });
+      }
+      return options;
+    })(),
+    // 円柱度数: -6.00 から +6.00 まで 0.25 刻み
+    cylinderOptions: (() => {
+      const options = [];
+      for (let i = -600; i <= 600; i += 25) {
+        const value = (i / 100).toFixed(2);
+        options.push({ value, label: value });
+      }
+      return options;
+    })(),
+    // 軸: 1 から 180 度まで
+    axisOptions: (() => {
+      const options = [];
+      for (let i = 1; i <= 180; i++) {
+        options.push({ value: i.toString(), label: i.toString() });
+      }
+      return options;
+    })(),
+    // 矯正視力: 0.1 から 2.0 まで 0.1 刻み
+    visionOptions: (() => {
+      const options = [];
+      for (let i = 1; i <= 20; i++) {
+        const value = (i / 10).toFixed(1);
+        options.push({ value, label: value });
+      }
+      return options;
+    })(),
+    // 瞳孔間距離: 50 から 80mm まで 1mm 刻み
+    pdOptions: (() => {
+      const options = [];
+      for (let i = 50; i <= 80; i++) {
+        options.push({ value: i.toString(), label: `${i}mm` });
+      }
+      return options;
+    })()
+  };
 
   // 初期化
   useEffect(() => {
@@ -274,6 +340,91 @@ const OrderEntryPage: React.FC = () => {
   };
 
 
+  // 受注入力リセット（キャンセル）
+  const handleCancelOrder = () => {
+    const confirmCancel = window.confirm('受注入力をキャンセルしてもよろしいですか？\n入力内容はすべて削除されます。');
+    if (confirmCancel) {
+      // 全ての状態をリセット
+      setCustomer(null);
+      setPrescription(null);
+      setOrderItems([]);
+      setActiveStep(0);
+      setPaidAmount(0);
+      setIsPartialPayment(false);
+      setNotes('');
+      setCustomerSearchQuery('');
+      setCustomerSearchResults([]);
+      setError(null);
+      setShowPrescriptionDialog(false);
+      setShowPrescriptionForm(false);
+      setPrescriptionForm({
+        rightEyeSphere: '',
+        rightEyeCylinder: '',
+        rightEyeAxis: '',
+        rightEyeVision: '',
+        leftEyeSphere: '',
+        leftEyeCylinder: '',
+        leftEyeAxis: '',
+        leftEyeVision: '',
+        pupilDistance: '',
+        measuredDate: new Date().toISOString().split('T')[0],
+        notes: ''
+      });
+      // デフォルト納期をリセット
+      const defaultDeliveryDate = new Date();
+      defaultDeliveryDate.setDate(defaultDeliveryDate.getDate() + 14);
+      setDeliveryDate(defaultDeliveryDate.toISOString().split('T')[0]);
+    }
+  };
+
+  // 処方箋保存
+  const handleSavePrescription = async () => {
+    if (!customer) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const prescriptionData = {
+        customerId: customer.id,
+        rightEyeSphere: parseFloat(prescriptionForm.rightEyeSphere) || 0,
+        rightEyeCylinder: parseFloat(prescriptionForm.rightEyeCylinder) || 0,
+        rightEyeAxis: parseInt(prescriptionForm.rightEyeAxis) || 0,
+        rightEyeVision: parseFloat(prescriptionForm.rightEyeVision) || 1.0,
+        leftEyeSphere: parseFloat(prescriptionForm.leftEyeSphere) || 0,
+        leftEyeCylinder: parseFloat(prescriptionForm.leftEyeCylinder) || 0,
+        leftEyeAxis: parseInt(prescriptionForm.leftEyeAxis) || 0,
+        leftEyeVision: parseFloat(prescriptionForm.leftEyeVision) || 1.0,
+        pupilDistance: parseFloat(prescriptionForm.pupilDistance) || 0,
+        measuredDate: prescriptionForm.measuredDate,
+        notes: prescriptionForm.notes || undefined
+      };
+
+      const response = await customerService.createPrescription(customer.id, prescriptionData);
+
+      if (response.success && response.data) {
+        setPrescription(response.data);
+        setShowPrescriptionForm(false);
+        
+        // レンズ商品を含む受注がある場合、処方箋完了ステータスに自動更新
+        const hasLensProducts = orderItems.some(item => item.product?.category === 'lens');
+        if (hasLensProducts && orderItems.length > 0) {
+          // 既に受注が確定している場合は、処方箋完了ステータスに更新
+          // ※ 受注確定前の場合は、受注確定時に自動的に適切なステータスが設定される
+          alert('処方箋が保存されました。\nレンズ商品を含む受注のため、受注確定後に発注対象となります。');
+        } else {
+          alert('処方箋が保存されました');
+        }
+      } else {
+        throw new Error(response.error?.message || '処方箋の保存に失敗しました');
+      }
+    } catch (err: any) {
+      setError(err.message || '処方箋の保存に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 受注作成
   const handleCreateOrder = async () => {
     if (!customer) {
@@ -290,9 +441,20 @@ const OrderEntryPage: React.FC = () => {
     setError(null);
 
     try {
+      // 商品カテゴリと処方箋の有無に基づいてステータスを決定
+      const hasLensProducts = orderItems.some(item => item.product?.category === 'lens');
+      const hasPrescription = prescription != null;
+      
+      // ステータス決定ロジック
+      let orderStatus: OrderStatus = 'ordered'; // デフォルト
+      if (hasLensProducts && hasPrescription) {
+        orderStatus = 'prescription_done'; // レンズ商品あり + 処方箋あり = 発注対象
+      }
+      
       // @REAL_API: 受注作成
       const orderData = {
         customerId: customer.id,
+        status: orderStatus, // 自動決定されたステータス
         items: orderItems.map(item => ({
           productId: item.productId,
           frameId: item.frameId,
@@ -316,7 +478,18 @@ const OrderEntryPage: React.FC = () => {
       const response = await orderService.createOrder(orderData as any); // 型チェック回避
 
       if (response.success && response.data) {
-        alert(`受注が正常に作成されました。\n受注番号: ${response.data.orderNumber}`);
+        let successMessage = `受注が正常に作成されました。\n受注番号: ${response.data.orderNumber}`;
+        
+        // ステータスに応じたメッセージを追加
+        if (orderStatus === 'prescription_done') {
+          successMessage += '\n\n✅ レンズ商品 + 処方箋完了のため、発注管理画面で発注対象として表示されます。';
+        } else if (hasLensProducts && !hasPrescription) {
+          successMessage += '\n\n⚠️ レンズ商品が含まれていますが処方箋未入力のため、処方箋入力後に発注対象となります。';
+        } else {
+          successMessage += '\n\n📦 フレーム等商品のため、在庫状況に応じて発注対象となります。';
+        }
+        
+        alert(successMessage);
         navigate('/orders');
       } else {
         throw new Error(response.error?.message || '受注の作成に失敗しました。');
@@ -340,9 +513,30 @@ const OrderEntryPage: React.FC = () => {
     <Box>
       {/* @MOCK_UI: モック使用バナー */}
 
-      <Typography variant="h5" gutterBottom fontWeight="bold">
-        受注入力
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight="bold">
+          受注入力
+        </Typography>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<CancelIcon />}
+            onClick={handleCancelOrder}
+            disabled={loading}
+          >
+            キャンセル
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => window.location.reload()}
+            disabled={loading}
+          >
+            リロード
+          </Button>
+        </Box>
+      </Box>
 
       {/* ステップ表示 */}
       <Card sx={{ mb: 3 }}>
@@ -480,6 +674,13 @@ const OrderEntryPage: React.FC = () => {
                   ) : (
                     <Typography color="text.secondary">なし</Typography>
                   )}
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setShowPrescriptionForm(true)}
+                  >
+                    {prescription ? '処方箋更新' : '処方箋入力'}
+                  </Button>
                 </Box>
               </Grid>
             </Grid>
@@ -895,6 +1096,278 @@ const OrderEntryPage: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setShowPrescriptionDialog(false)}>
             閉じる
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 処方箋入力ダイアログ */}
+      <Dialog
+        open={showPrescriptionForm}
+        onClose={() => setShowPrescriptionForm(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>処方箋入力</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {/* 右眼 */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom color="primary">
+                右眼 (R)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>球面度数 (S)</InputLabel>
+                    <Select
+                      value={prescriptionForm.rightEyeSphere}
+                      label="球面度数 (S)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, rightEyeSphere: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.sphereOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      ディオプター (D)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>円柱度数 (C)</InputLabel>
+                    <Select
+                      value={prescriptionForm.rightEyeCylinder}
+                      label="円柱度数 (C)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, rightEyeCylinder: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.cylinderOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      ディオプター (D)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>軸 (AX)</InputLabel>
+                    <Select
+                      value={prescriptionForm.rightEyeAxis}
+                      label="軸 (AX)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, rightEyeAxis: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.axisOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      度 (°)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>矯正視力</InputLabel>
+                    <Select
+                      value={prescriptionForm.rightEyeVision}
+                      label="矯正視力"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, rightEyeVision: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.visionOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      視力値
+                    </Typography>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* 左眼 */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" gutterBottom color="secondary">
+                左眼 (L)
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>球面度数 (S)</InputLabel>
+                    <Select
+                      value={prescriptionForm.leftEyeSphere}
+                      label="球面度数 (S)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, leftEyeSphere: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.sphereOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      ディオプター (D)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>円柱度数 (C)</InputLabel>
+                    <Select
+                      value={prescriptionForm.leftEyeCylinder}
+                      label="円柱度数 (C)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, leftEyeCylinder: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.cylinderOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      ディオプター (D)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>軸 (AX)</InputLabel>
+                    <Select
+                      value={prescriptionForm.leftEyeAxis}
+                      label="軸 (AX)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, leftEyeAxis: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.axisOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      度 (°)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>矯正視力</InputLabel>
+                    <Select
+                      value={prescriptionForm.leftEyeVision}
+                      label="矯正視力"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, leftEyeVision: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.visionOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      視力値
+                    </Typography>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Grid>
+
+            {/* 共通項目 */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>瞳孔間距離 (PD)</InputLabel>
+                    <Select
+                      value={prescriptionForm.pupilDistance}
+                      label="瞳孔間距離 (PD)"
+                      onChange={(e) => setPrescriptionForm(prev => ({...prev, pupilDistance: e.target.value}))}
+                    >
+                      <MenuItem value="">
+                        <em>選択してください</em>
+                      </MenuItem>
+                      {prescriptionOptions.pdOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <Typography variant="caption" color="text.secondary">
+                      ミリメートル (mm)
+                    </Typography>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="測定日"
+                    type="date"
+                    value={prescriptionForm.measuredDate}
+                    onChange={(e) => setPrescriptionForm(prev => ({...prev, measuredDate: e.target.value}))}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  {/* スペーサー */}
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="備考"
+                    multiline
+                    rows={3}
+                    value={prescriptionForm.notes}
+                    onChange={(e) => setPrescriptionForm(prev => ({...prev, notes: e.target.value}))}
+                    placeholder="検眼時の特記事項など"
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowPrescriptionForm(false)}>
+            キャンセル
+          </Button>
+          <Button 
+            onClick={handleSavePrescription}
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? '保存中...' : '処方箋保存'}
           </Button>
         </DialogActions>
       </Dialog>

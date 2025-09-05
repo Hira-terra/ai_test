@@ -179,6 +179,11 @@ export const apiAuthService = {
     }
   },
 
+  // トークン取得
+  getToken: (): string | null => {
+    return localStorage.getItem('token');
+  },
+
   // ログアウト
   logout: async (): Promise<ApiResponse<void>> => {
     console.info('✅ Using REAL API for logout');

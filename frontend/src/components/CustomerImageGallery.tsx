@@ -27,8 +27,7 @@ import {
 } from '@mui/icons-material';
 import { CustomerImage } from '@/types';
 
-// @MOCK_LOGIC: モック画像データの取得用
-import { MOCK_IMAGE_DATA } from '@/services/mock/data/customerImage.mock';
+// 実API使用に統一済み - モック参照削除
 
 interface CustomerImageGalleryProps {
   images: CustomerImage[];
@@ -181,10 +180,10 @@ export const CustomerImageGallery: React.FC<CustomerImageGalleryProps> = ({
                     position: 'relative',
                   }}
                 >
-                  {/* モック画像またはアイコン表示 */}
-                  {MOCK_IMAGE_DATA[image.id] ? (
+                  {/* 実API画像表示 */}
+                  {image.filePath ? (
                     <img
-                      src={MOCK_IMAGE_DATA[image.id]}
+                      src={`/api/customers/${image.customerId}/images/${image.id}/file`}
                       alt={image.title || image.fileName}
                       style={{
                         width: '100%',

@@ -12,11 +12,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-glasses_pass}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - postgres_data:/var/lib/postgresql
-      # 初期化スクリプトは既存データがある場合は実行されない
-      # - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-      # - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
-      # - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+      # 初期化スクリプト（新規作成時のみ実行される）
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
     ports:
       - "${DB_PORT:-5432}:5432"
     networks:
@@ -182,21 +182,16 @@ networks:
 
 volumes:
   postgres_data:
-    external: true
     name: glasses_store_postgres_data
   
   redis_data:
-    external: true
     name: glasses_store_redis_data
   
   backend_node_modules:
-    external: true
     name: glasses_store_backend_node_modules
   
   frontend_node_modules:
-    external: true
     name: glasses_store_frontend_node_modules
   
   pgadmin_data:
-    external: true
     name: glasses_store_pgadmin_data

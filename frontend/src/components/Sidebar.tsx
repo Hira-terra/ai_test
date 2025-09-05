@@ -15,6 +15,7 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   ShoppingCart as OrderIcon,
+  LocalShipping as PurchaseOrderIcon,
   PointOfSale as CashRegisterIcon,
   Inventory as InventoryIcon,
   BarChart as AnalyticsIcon,
@@ -46,6 +47,11 @@ const navigationItems: NavigationItem[] = [
     path: '/cash-register',
     label: 'レジ精算',
     icon: CashRegisterIcon,
+  },
+  {
+    path: '/purchase-orders',
+    label: '発注管理',
+    icon: PurchaseOrderIcon,
   },
   {
     path: '/inventory',

@@ -173,7 +173,19 @@ export class CustomerRepository {
     logger.debug(`[${operationId}] 顧客検索開始 (ID: ${id})`);
 
     try {
-      const query = `SELECT * FROM customers WHERE id = $1${storeId ? ' AND store_id = $2' : ''}`;
+      const query = `
+        SELECT 
+          c.*,
+          s.id as store_id_detail,
+          s.store_code as store_code,
+          s.name as store_name,
+          s.address as store_address,
+          s.phone as store_phone,
+          s.manager_name as store_manager_name
+        FROM customers c
+        LEFT JOIN stores s ON c.store_id = s.id
+        WHERE c.id = $1${storeId ? ' AND c.store_id = $2' : ''}
+      `;
       const params = storeId ? [id, storeId] : [id];
       const result = await this.db.query(query, params);
 

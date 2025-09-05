@@ -17,6 +17,7 @@ import customerRoutes from './routes/customer.routes';
 import productRoutes from './routes/product.routes';
 import orderRoutes from './routes/order.routes';
 import userRoutes from './routes/user.routes';
+import purchaseOrderRoutes from './routes/purchaseOrder.routes';
 
 // ミドルウェアのインポート
 import { rateLimiter } from './middleware/rateLimiter';
@@ -113,7 +114,8 @@ class Application {
           customers: '/api/customers',
           products: '/api/products',
           orders: '/api/orders',
-          users: '/api/users'
+          users: '/api/users',
+          purchaseOrders: '/api/purchase-orders'
         }
       });
     });
@@ -150,6 +152,7 @@ class Application {
     this.app.use('/api/products', productRoutes);
     this.app.use('/api/orders', orderRoutes);
     this.app.use('/api/users', userRoutes);
+    this.app.use('/api/purchase-orders', purchaseOrderRoutes);
 
     // ルートが見つからない場合の処理
     this.app.use('/api/*', (req, res) => {
