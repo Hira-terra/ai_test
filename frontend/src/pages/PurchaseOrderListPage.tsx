@@ -42,6 +42,7 @@ const PurchaseOrderListPage: React.FC = () => {
   
   // 発注作成ダイアログ
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
@@ -96,12 +97,16 @@ const PurchaseOrderListPage: React.FC = () => {
     }
   };
 
-  const handleCreatePurchaseOrder = async () => {
+  const handleOpenConfirmDialog = () => {
     if (!selectedSupplierId || selectedOrders.length === 0) {
       setError('仕入先と受注を選択してください');
       return;
     }
+    setCreateDialogOpen(false);
+    setConfirmDialogOpen(true);
+  };
 
+  const handleCreatePurchaseOrder = async () => {
     try {
       setCreating(true);
       setError(null);
@@ -115,7 +120,7 @@ const PurchaseOrderListPage: React.FC = () => {
 
       if (result.success && result.data) {
         setSuccess('発注を作成しました: ' + result.data.purchaseOrderNumber);
-        setCreateDialogOpen(false);
+        setConfirmDialogOpen(false);
         setSelectedOrders([]);
         setSelectedSupplierId('');
         setExpectedDeliveryDate('');
@@ -133,6 +138,20 @@ const PurchaseOrderListPage: React.FC = () => {
     } finally {
       setCreating(false);
     }
+  };
+
+  const getSelectedOrdersTotal = () => {
+    return selectedOrders.reduce((total, orderId) => {
+      const order = availableOrders.find(o => o.id === orderId);
+      const orderCostTotal = order?.items?.reduce((itemTotal, item) => {
+        return itemTotal + ((item.product?.costPrice || 0) * item.quantity);
+      }, 0) || 0;
+      return total + orderCostTotal;
+    }, 0);
+  };
+
+  const getSelectedOrdersDetails = () => {
+    return availableOrders.filter(order => selectedOrders.includes(order.id));
   };
 
   const getOrderStatusChip = (status: string) => {
@@ -369,11 +388,135 @@ const PurchaseOrderListPage: React.FC = () => {
             キャンセル
           </Button>
           <Button
+            onClick={handleOpenConfirmDialog}
+            variant="contained"
+            color="primary"
+            disabled={!selectedSupplierId || selectedOrders.length === 0}
+          >
+            次へ（確認画面）
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 発注確認ダイアログ */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>発注内容の確認</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            以下の内容で発注を作成します。内容をご確認ください。
+          </Alert>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                仕入先情報
+              </Typography>
+              <Box sx={{ pl: 2, mt: 1 }}>
+                <Typography variant="body2">
+                  {suppliers.find(s => s.id === selectedSupplierId)?.name} 
+                  ({suppliers.find(s => s.id === selectedSupplierId)?.supplierCode})
+                </Typography>
+                {expectedDeliveryDate && (
+                  <Typography variant="body2">
+                    納期予定日: {expectedDeliveryDate}
+                  </Typography>
+                )}
+                {notes && (
+                  <Typography variant="body2">
+                    備考: {notes}
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                発注明細 ({selectedOrders.length}件)
+              </Typography>
+              <TableContainer sx={{ mt: 1, maxHeight: 300 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>受注番号</TableCell>
+                      <TableCell>顧客名</TableCell>
+                      <TableCell>商品コード</TableCell>
+                      <TableCell>商品名</TableCell>
+                      <TableCell align="right">数量</TableCell>
+                      <TableCell align="right">仕入単価</TableCell>
+                      <TableCell align="right">仕入金額</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {getSelectedOrdersDetails().map((order) => (
+                      order.items?.map((item, itemIndex) => (
+                        <TableRow key={`${order.id}-${itemIndex}`}>
+                          {itemIndex === 0 && (
+                            <>
+                              <TableCell rowSpan={order.items?.length || 1}>
+                                {order.orderNumber}
+                              </TableCell>
+                              <TableCell rowSpan={order.items?.length || 1}>
+                                {order.customer?.fullName}
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell>{item.product?.productCode || '不明'}</TableCell>
+                          <TableCell>{item.product?.name || '不明'}</TableCell>
+                          <TableCell align="right">{item.quantity}</TableCell>
+                          <TableCell align="right">
+                            {formatCurrency(item.product?.costPrice || 0)}
+                          </TableCell>
+                          <TableCell align="right">
+                            {formatCurrency((item.product?.costPrice || 0) * item.quantity)}
+                          </TableCell>
+                        </TableRow>
+                      )) || []
+                    )).flat()}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                bgcolor: 'grey.100',
+                p: 2,
+                borderRadius: 1
+              }}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  合計仕入金額
+                </Typography>
+                <Typography variant="h6" color="primary">
+                  {formatCurrency(getSelectedOrdersTotal())}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setConfirmDialogOpen(false);
+              setCreateDialogOpen(true);
+            }}
+          >
+            戻る
+          </Button>
+          <Button
             onClick={handleCreatePurchaseOrder}
             variant="contained"
-            disabled={creating || !selectedSupplierId || selectedOrders.length === 0}
+            color="primary"
+            disabled={creating}
           >
-            {creating ? <CircularProgress size={20} /> : '発注作成'}
+            {creating ? <CircularProgress size={20} /> : '発注を確定'}
           </Button>
         </DialogActions>
       </Dialog>

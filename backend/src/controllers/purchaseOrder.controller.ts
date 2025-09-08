@@ -105,6 +105,43 @@ export const getPurchaseOrders = async (req: AuthenticatedRequest, res: Response
 };
 
 /**
+ * 発注履歴取得
+ */
+export const getPurchaseOrderHistory = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { storeId, supplierId, status, fromDate, toDate } = req.query;
+    
+    const purchaseOrders = await purchaseOrderService.getPurchaseOrderHistory({
+      storeId: storeId as string,
+      supplierId: supplierId as string,
+      status: status as any,
+      fromDate: fromDate as string,
+      toDate: toDate as string,
+    });
+    
+    return res.json({
+      success: true,
+      data: purchaseOrders
+    });
+  } catch (error) {
+    logger.error('[PurchaseOrderController] 発注履歴取得エラー', { error });
+    
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+        details: error.details
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      error: '発注履歴の取得に失敗しました'
+    });
+  }
+};
+
+/**
  * 発注詳細取得
  */
 export const getPurchaseOrderById = async (req: AuthenticatedRequest, res: Response) => {
@@ -363,6 +400,7 @@ export const getStatistics = async (req: AuthenticatedRequest, res: Response) =>
 export const purchaseOrderController = {
   getAvailableOrders,
   getPurchaseOrders,
+  getPurchaseOrderHistory,
   getPurchaseOrderById,
   createPurchaseOrder,
   updateStatus,

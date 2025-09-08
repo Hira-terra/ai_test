@@ -566,6 +566,7 @@ export interface Receiving {
 }
 
 export type ReceivingStatus = 'partial' | 'complete' | 'with_issues';
+export type QualityStatus = 'good' | 'damaged' | 'defective' | 'incorrect_spec';
 
 export interface ReceivingItem {
   id: UUID;
@@ -574,7 +575,7 @@ export interface ReceivingItem {
   purchaseOrderItem?: PurchaseOrderItem;
   expectedQuantity: number;
   receivedQuantity: number;
-  qualityStatus: 'good' | 'damaged' | 'defective' | 'incorrect_spec';
+  qualityStatus: QualityStatus;
   actualCost?: number; // 実際の仕入価格（請求書ベース）
   notes?: string;
 }

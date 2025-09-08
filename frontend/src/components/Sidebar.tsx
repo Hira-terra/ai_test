@@ -54,6 +54,11 @@ const navigationItems: NavigationItem[] = [
     icon: PurchaseOrderIcon,
   },
   {
+    path: '/purchase-orders/history',
+    label: '発注履歴',
+    icon: PurchaseOrderIcon,
+  },
+  {
     path: '/inventory',
     label: '在庫管理',
     icon: InventoryIcon,

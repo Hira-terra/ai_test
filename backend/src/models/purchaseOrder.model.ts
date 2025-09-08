@@ -248,7 +248,7 @@ export class PurchaseOrderModel {
         RETURNING id
       `;
       
-      const poResult = await client.query(insertPOQuery, [
+      const insertPoResult = await client.query(insertPOQuery, [
         purchaseOrderData.purchaseOrderNumber,
         purchaseOrderData.supplierId,
         purchaseOrderData.storeId,
@@ -257,22 +257,28 @@ export class PurchaseOrderModel {
         purchaseOrderData.createdBy
       ]);
       
-      const purchaseOrderId = poResult.rows[0].id;
+      const purchaseOrderId = insertPoResult.rows[0].id;
 
       // 対象受注から発注明細を作成
+      let totalItems = 0;
+      
       for (const orderId of purchaseOrderData.orderIds) {
         const orderItemsQuery = `
           SELECT 
             oi.product_id,
             oi.prescription_id,
             oi.quantity,
-            p.cost_price
+            p.cost_price,
+            p.name as product_name,
+            p.category
           FROM order_items oi
           LEFT JOIN products p ON oi.product_id = p.id
-          WHERE oi.order_id = $1 AND p.category = 'lens'
+          WHERE oi.order_id = $1
         `;
         
         const orderItemsResult = await client.query(orderItemsQuery, [orderId]);
+        
+        console.log(`[PurchaseOrder] Order ${orderId} items:`, orderItemsResult.rows.length);
         
         for (const item of orderItemsResult.rows) {
           const insertItemQuery = `
@@ -285,6 +291,8 @@ export class PurchaseOrderModel {
           const unitCost = item.cost_price || 0;
           const totalCost = unitCost * item.quantity;
           
+          console.log(`[PurchaseOrder] Adding item: ${item.product_name} (${item.category}), cost: ${unitCost}`);
+          
           await client.query(insertItemQuery, [
             purchaseOrderId,
             orderId,
@@ -294,24 +302,93 @@ export class PurchaseOrderModel {
             unitCost,
             totalCost
           ]);
+          
+          totalItems++;
         }
+      }
+      
+      if (totalItems === 0) {
+        throw new Error('発注対象の商品がありません');
       }
 
       // 合計金額を計算・更新
       await this.updateTotals(client, purchaseOrderId);
       
+      // 作成した発注を同一トランザクション内で取得して返却
+      console.log('[PurchaseOrder] Fetching created purchase order in transaction:', purchaseOrderId);
+      
+      const getPOQuery = `
+        SELECT 
+          po.id,
+          po.purchase_order_number as "purchaseOrderNumber",
+          po.supplier_id as "supplierId",
+          po.store_id as "storeId",
+          po.order_date as "orderDate",
+          po.expected_delivery_date as "expectedDeliveryDate",
+          po.actual_delivery_date as "actualDeliveryDate",
+          po.status,
+          po.subtotal_amount as "subtotalAmount",
+          po.tax_amount as "taxAmount",
+          po.total_amount as "totalAmount",
+          po.notes,
+          po.sent_at as "sentAt",
+          po.confirmed_at as "confirmedAt",
+          po.created_by as "createdBy",
+          po.created_at as "createdAt",
+          po.updated_at as "updatedAt"
+        FROM purchase_orders po
+        WHERE po.id = $1
+      `;
+      
+      const fetchPoResult = await client.query(getPOQuery, [purchaseOrderId]);
+      if (fetchPoResult.rows.length === 0) {
+        throw new Error(`作成した発注が見つかりません: ${purchaseOrderId}`);
+      }
+      
+      const purchaseOrder = this.transformRow(fetchPoResult.rows[0]) as PurchaseOrder;
+      
+      // 発注明細を同一トランザクション内で取得
+      const getItemsQuery = `
+        SELECT 
+          poi.id,
+          poi.purchase_order_id as "purchaseOrderId",
+          poi.order_id as "orderId",
+          poi.product_id as "productId",
+          poi.prescription_id as "prescriptionId",
+          poi.quantity,
+          poi.unit_cost as "unitCost",
+          poi.total_cost as "totalCost",
+          poi.specifications,
+          poi.notes
+        FROM purchase_order_items poi
+        WHERE poi.purchase_order_id = $1
+      `;
+      
+      const itemsResult = await client.query(getItemsQuery, [purchaseOrderId]);
+      purchaseOrder.items = itemsResult.rows.map((row: any) => ({
+        id: row.id,
+        purchaseOrderId: row.purchaseOrderId,
+        orderId: row.orderId,
+        productId: row.productId,
+        prescriptionId: row.prescriptionId,
+        quantity: row.quantity,
+        unitCost: parseFloat(row.unitCost),
+        totalCost: parseFloat(row.totalCost),
+        specifications: row.specifications,
+        notes: row.notes
+      }));
+      
       if (shouldManageTransaction) {
         await client.query('COMMIT');
       }
       
-      // 作成した発注を取得して返却
-      const result = await this.findById(purchaseOrderId);
-      return result!;
+      return purchaseOrder;
       
     } catch (error) {
       if (shouldManageTransaction) {
         await client.query('ROLLBACK');
       }
+      console.error('[PurchaseOrder] Create error:', error);
       throw error;
     } finally {
       if (shouldManageTransaction) {

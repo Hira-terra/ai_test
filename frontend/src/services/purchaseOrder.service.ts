@@ -87,6 +87,49 @@ class PurchaseOrderService {
   }
 
   /**
+   * 発注履歴を取得
+   */
+  async getPurchaseOrderHistory(params?: {
+    storeId?: string;
+    supplierId?: string;
+    status?: PurchaseOrderStatus;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<ApiResponse<PurchaseOrder[]>> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.storeId) queryParams.append('storeId', params.storeId);
+      if (params?.supplierId) queryParams.append('supplierId', params.supplierId);
+      if (params?.status) queryParams.append('status', params.status);
+      if (params?.fromDate) queryParams.append('fromDate', params.fromDate);
+      if (params?.toDate) queryParams.append('toDate', params.toDate);
+
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      // レスポンス構造を調整（pagination情報を除く）
+      return {
+        success: result.success,
+        data: result.data?.purchaseOrders || result.data || [],
+        error: result.error
+      };
+    } catch (error) {
+      console.error('発注履歴取得エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 発注詳細を取得
    */
   async getPurchaseOrderById(id: string): Promise<ApiResponse<PurchaseOrder>> {

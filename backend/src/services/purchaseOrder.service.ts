@@ -93,6 +93,37 @@ export class PurchaseOrderService {
   }
 
   /**
+   * 発注履歴を取得
+   */
+  async getPurchaseOrderHistory(params?: {
+    storeId?: string;
+    supplierId?: string;
+    status?: PurchaseOrderStatus;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<PurchaseOrder[]> {
+    try {
+      logger.info('[PurchaseOrderService] 発注履歴取得開始', { params });
+      
+      const result = await this.purchaseOrderModel.findAll({
+        ...params,
+        sort: 'order_date_desc'
+      });
+      
+      logger.info('[PurchaseOrderService] 発注履歴取得完了', { 
+        count: result.purchaseOrders.length 
+      });
+      
+      return result.purchaseOrders;
+    } catch (error) {
+      logger.error('[PurchaseOrderService] 発注履歴取得エラー', { 
+        error: error instanceof Error ? error.message : error 
+      });
+      throw error;
+    }
+  }
+
+  /**
    * 発注詳細を取得
    */
   async getPurchaseOrderById(id: string): Promise<PurchaseOrder> {
@@ -170,6 +201,13 @@ export class PurchaseOrderService {
       const purchaseOrderNumber = await this.generatePurchaseOrderNumber(data.storeId);
 
       // 発注を作成
+      logger.info('[PurchaseOrderService] 発注モデル作成開始', {
+        purchaseOrderNumber,
+        supplierId: data.supplierId,
+        storeId: data.storeId,
+        orderCount: validOrderIds.length
+      });
+      
       const purchaseOrder = await this.purchaseOrderModel.create({
         purchaseOrderNumber,
         supplierId: data.supplierId,
@@ -181,7 +219,7 @@ export class PurchaseOrderService {
       }, client);
 
       if (!purchaseOrder) {
-        throw new Error('発注の作成に失敗しました');
+        throw new Error('発注の作成に失敗しました - モデルからnullが返却されました');
       }
 
       // 受注ステータスを「発注済み」に更新

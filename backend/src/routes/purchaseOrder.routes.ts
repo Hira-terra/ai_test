@@ -16,6 +16,9 @@ router.get('/suppliers', purchaseOrderController.getSuppliers);
 // 発注統計取得
 router.get('/statistics', purchaseOrderController.getStatistics);
 
+// 発注履歴取得（specificなルートなので先に配置）
+router.get('/history', purchaseOrderController.getPurchaseOrderHistory);
+
 // 発注関連
 router.get('/', purchaseOrderController.getPurchaseOrders);
 router.get('/:id', purchaseOrderController.getPurchaseOrderById);
