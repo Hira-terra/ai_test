@@ -21,6 +21,8 @@ import {
   BarChart as AnalyticsIcon,
   ManageAccounts as UserIcon,
   Store as StoreIcon,
+  LocalShipping as ReceivingIcon,
+  QrCode as QrCodeIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { NavigationItem } from '@/types';
@@ -57,6 +59,17 @@ const navigationItems: NavigationItem[] = [
     path: '/purchase-orders/history',
     label: '発注履歴',
     icon: PurchaseOrderIcon,
+  },
+  {
+    path: '/individual-management',
+    label: '個体管理',
+    icon: QrCodeIcon,
+    requiredPermissions: ['staff', 'manager', 'admin'],
+  },
+  {
+    path: '/receiving',
+    label: '入庫管理',
+    icon: ReceivingIcon,
   },
   {
     path: '/inventory',

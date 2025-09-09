@@ -19,6 +19,7 @@ import orderRoutes from './routes/order.routes';
 import userRoutes from './routes/user.routes';
 import purchaseOrderRoutes from './routes/purchaseOrder.routes';
 import receivingRoutes from './routes/receiving.routes';
+import frameRoutes from './routes/frame.routes';
 
 // ミドルウェアのインポート
 import { rateLimiter } from './middleware/rateLimiter';
@@ -117,7 +118,8 @@ class Application {
           orders: '/api/orders',
           users: '/api/users',
           purchaseOrders: '/api/purchase-orders',
-          receiving: '/api/receiving'
+          receiving: '/api/receiving',
+          frames: '/api/frames'
         }
       });
     });
@@ -156,6 +158,7 @@ class Application {
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/purchase-orders', purchaseOrderRoutes);
     this.app.use('/api/receiving', receivingRoutes);
+    this.app.use('/api/frames', frameRoutes);
 
     // ルートが見つからない場合の処理
     this.app.use('/api/*', (req, res) => {

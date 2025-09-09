@@ -569,6 +569,8 @@ export interface Receiving {
 
 export type ReceivingStatus = 'partial' | 'complete' | 'with_issues';
 
+export type QualityStatus = 'good' | 'damaged' | 'defective' | 'incorrect_spec' | 'passed' | 'failed' | 'pending' | 'partial';
+
 export interface ReceivingItem {
   id: UUID;
   receivingId: UUID;

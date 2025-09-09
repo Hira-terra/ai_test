@@ -84,11 +84,6 @@ export class OrderModel {
           LEFT JOIN frames f ON oi.frame_id = f.id
           WHERE oi.order_id = o.id 
           AND p.category IN ('frame', 'contact', 'accessory')
-          AND (
-            (p.category = 'frame' AND f.id IS NOT NULL AND f.status != 'in_stock')
-            OR
-            (p.category IN ('contact', 'accessory'))
-          )
           AND NOT EXISTS (
             SELECT 1 FROM purchase_order_items poi
             WHERE poi.order_id = o.id AND poi.product_id = p.id
@@ -171,7 +166,7 @@ export class OrderModel {
     // 各受注の商品情報も取得
     const orders = [];
     for (const row of result.rows) {
-      const items = await this.getOrderItemsWithLens(row.id);
+      const items = await this.getAllOrderItems(row.id);
       const order = this.transformRow(row);
       order.items = items;
       orders.push(order);
@@ -217,6 +212,50 @@ export class OrderModel {
       LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN prescriptions pr ON oi.prescription_id = pr.id
       WHERE oi.order_id = $1 AND p.category = 'lens'
+      ORDER BY oi.created_at
+    `;
+
+    const result = await this.pool.query(query, [orderId]);
+    return result.rows.map(row => this.transformItemRow(row));
+  }
+
+  /**
+   * 全ての受注明細を取得（レンズ・フレーム含む）
+   */
+  private async getAllOrderItems(orderId: string): Promise<OrderItem[]> {
+    const query = `
+      SELECT 
+        oi.id,
+        oi.order_id as "orderId",
+        oi.product_id as "productId",
+        oi.frame_id as "frameId",
+        oi.quantity,
+        oi.unit_price as "unitPrice",
+        oi.total_price as "totalPrice",
+        oi.prescription_id as "prescriptionId",
+        oi.notes,
+        -- 商品情報
+        p.id as "product.id",
+        p.product_code as "product.productCode",
+        p.name as "product.name",
+        p.brand as "product.brand",
+        p.category as "product.category",
+        p.retail_price as "product.retailPrice",
+        p.cost_price as "product.costPrice",
+        -- 処方箋情報
+        pr.id as "prescription.id",
+        pr.measured_date as "prescription.measuredDate",
+        pr.right_eye_sphere as "prescription.rightEyeSphere",
+        pr.right_eye_cylinder as "prescription.rightEyeCylinder",
+        pr.right_eye_axis as "prescription.rightEyeAxis",
+        pr.left_eye_sphere as "prescription.leftEyeSphere",
+        pr.left_eye_cylinder as "prescription.leftEyeCylinder",
+        pr.left_eye_axis as "prescription.leftEyeAxis",
+        pr.pupil_distance as "prescription.pupilDistance"
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN prescriptions pr ON oi.prescription_id = pr.id
+      WHERE oi.order_id = $1
       ORDER BY oi.created_at
     `;
 
@@ -432,6 +471,7 @@ export class OrderRepository {
     product_name?: string;
     product_code?: string;
     product_brand?: string;
+    product_category?: string;
     frame_serial_number?: string;
     frame_color?: string;
   }): OrderItem {
@@ -444,7 +484,7 @@ export class OrderRepository {
         productCode: row.product_code || '',
         name: row.product_name,
         brand: row.product_brand,
-        category: 'frame', // デフォルト値
+        category: row.product_category as any || 'frame', // 実際のカテゴリーを使用
         managementType: 'individual',
         retailPrice: row.unit_price,
         isActive: true,
@@ -624,9 +664,15 @@ export class OrderRepository {
     const query = `
       SELECT 
         oi.*,
+        p.id as product_id,
         p.name as product_name,
         p.product_code,
         p.brand as product_brand,
+        p.category as product_category,
+        p.retail_price,
+        p.cost_price,
+        p.management_type,
+        p.is_active,
         f.serial_number as frame_serial_number,
         f.color as frame_color
       FROM order_items oi
@@ -637,7 +683,45 @@ export class OrderRepository {
     `;
 
     const result = await this.db.query(query, [orderId]);
-    return result.rows.map((row: any) => this.transformToOrderItem(row));
+    return result.rows.map((row: any) => this.transformToOrderItemWithProduct(row));
+  }
+
+  private transformToOrderItemWithProduct(row: any): OrderItem {
+    return {
+      id: row.id,
+      orderId: row.order_id,
+      productId: row.product_id,
+      product: {
+        id: row.product_id,
+        productCode: row.product_code || '',
+        name: row.product_name || '',
+        brand: row.product_brand || '',
+        category: row.product_category || 'frame',
+        managementType: row.management_type || 'individual',
+        retailPrice: parseFloat(row.retail_price) || 0,
+        costPrice: parseFloat(row.cost_price) || 0,
+        isActive: row.is_active || true,
+        createdAt: '',
+        updatedAt: ''
+      } as Product,
+      frameId: row.frame_id,
+      frame: row.frame_serial_number ? {
+        id: row.frame_id!,
+        productId: row.product_id,
+        storeId: '', // 必要に応じて取得
+        serialNumber: row.frame_serial_number,
+        color: row.frame_color,
+        purchaseDate: '',
+        status: 'sold',
+        createdAt: '',
+        updatedAt: ''
+      } as Frame : undefined,
+      quantity: row.quantity,
+      unitPrice: parseFloat(row.unit_price) || 0,
+      totalPrice: parseFloat(row.total_price) || 0,
+      prescriptionId: row.prescription_id,
+      notes: row.notes
+    };
   }
 
   // 入金履歴取得

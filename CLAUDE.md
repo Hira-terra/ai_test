@@ -1629,3 +1629,440 @@ docker-compose ps  # 全コンテナHealthy確認
 - 入庫・製作・お渡し管理: 未実装（次回実装予定）
 - レポート・分析機能: 基礎実装済み
 - システム運用機能: Docker環境完全構築
+
+## 2025年9月9日 個体管理システム要件定義の重要な追記・修正
+
+### 【重要】現在の実装で漏れている眼鏡店業務要件
+
+#### 1. 個体管理システムの重要な追加要件
+
+**現在の問題点分析**:
+- 個体番号生成・登録機能は実装済み
+- 個体検索・一覧表示機能も実装済み
+- **しかし、実際の眼鏡店業務で必要な以下の機能が完全に不足**:
+
+##### 1.1 個体ライフサイクル管理の不備
+
+**A. 個体のステータス変更履歴追跡**
+- 要件: `in_stock → reserved → sold` のステータス変更履歴を記録
+- 漏れ: 現在はステータス更新のみで、いつ誰が変更したかの履歴が残らない
+- 追加テーブル: `frame_status_history` テーブルが必要
+
+**B. 個体と受注の紐付け管理**
+- 要件: どの個体がどの受注に紐付いているかの完全な追跡
+- 漏れ: `reserved` ステータス時にどの顧客の受注に紐付いているかが不明確
+- 現在の問題: 複数の顧客が同じフレームを希望した場合の調整ができない
+
+**C. 個体の品質検査・メンテナンス記録**
+- 要件: 入庫時品質検査、定期メンテナンス、修理履歴の記録
+- 漏れ: `damaged` ステータスの詳細理由、修理可否判定、修理履歴
+- 追加テーブル: `frame_quality_records` テーブルが必要
+
+##### 1.2 在庫移動・配送管理の不備
+
+**A. 店舗間移動管理**
+- 要件: フレーム個体の店舗間移動（転送・貸出・返却）の完全追跡
+- 漏れ: 現在の `location` カラムだけでは移動履歴が分からない
+- 追加テーブル: `frame_transfers` テーブルが必要
+
+**B. 仮押さえ・予約管理**
+- 要件: 顧客の検討期間中の仮押さえ管理（期限付き予約）
+- 漏れ: `reserved` ステータスに期限の概念がない
+- 問題: いつまでも `reserved` のままになる可能性
+
+##### 1.3 個体検索・分析機能の不備
+
+**A. 高度な個体検索**
+- 要件: 商品名・ブランド・価格帯・カラー・サイズでの複合検索
+- 漏れ: 現在は個体番号とステータスでの基本検索のみ
+- ユースケース: 「Oakleyのブラック、Lサイズ、3万円以下で在庫中」で検索
+
+**B. 売上・在庫分析**
+- 要件: 商品別・カラー別・サイズ別・店舗別の売上・在庫分析
+- 漏れ: 現在は基本的な個体一覧表示のみ
+- ビジネス価値: どの商品・色・サイズが売れ筋かの分析
+
+#### 2. QRコード・バーコード管理システムの実装不備
+
+**現在の状況**: IndividualItemAssignmentDialogにQRコードスキャンボタンがあるが機能未実装
+
+**必要な実装**:
+
+**A. QRコード生成・印刷機能**
+- 個体番号登録時の自動QRコード生成
+- QRコードラベル印刷機能（複数個体の一括印刷対応）
+- QRコード内容: `{個体番号}|{商品コード}|{店舗コード}|{登録日}`
+
+**B. QRコードスキャン機能**
+- 個体検索でのQRコードスキャン対応
+- 受注時の個体選択でのQRコードスキャン対応
+- 在庫確認でのQRコードスキャン対応
+
+**C. モバイル対応**
+- スマートフォン・タブレットでのQRコード読み取り
+- 現場スタッフの効率的な在庫確認作業
+
+#### 3. 個体管理と受注システムの統合不備
+
+**A. 受注時の個体自動割り当て**
+- 要件: 受注確定時に条件に合う個体の自動選択・割り当て
+- 漏れ: 現在は手動で個体を選択する必要がある
+- 自動割り当て条件: ブランド > カラー > サイズ > 入荷日 の優先順位
+
+**B. 個体不足時の自動発注連携**
+- 要件: 在庫不足時の自動発注書作成・仕入先連携
+- 漏れ: 現在は手動で発注管理が必要
+- 自動化: 安全在庫を下回った場合の自動発注機能
+
+#### 4. 製作・加工工程との統合不備
+
+**A. レンズ加工との紐付け**
+- 要件: フレーム個体とレンズ加工指示書の完全連携
+- 漏れ: 現在は受注管理とレンズ加工が分離している
+- 必要機能: フレーム個体 + 処方箋 → 加工指示書の自動生成
+
+**B. 完成品管理**
+- 要件: 加工完成後の完成品個体管理（フレーム+レンズの複合個体）
+- 漏れ: 現在はフレーム個体のみで、レンズ装着後の管理が不明確
+- 追加テーブル: `finished_products` テーブルが必要
+
+#### 5. 顧客対応・接客支援機能の不備
+
+**A. 個体の顧客提案・比較機能**
+- 要件: 顧客の希望に基づく複数個体の比較表示
+- 漏れ: 現在は個体一覧表示のみで比較機能がない
+- 必要機能: 価格・特徴・在庫状況の並列比較表示
+
+**B. 個体の予約・取り置き管理**
+- 要件: 顧客の検討期間中の個体取り置き管理
+- 漏れ: 現在の `reserved` ステータスに期限・顧客情報がない
+- 必要機能: 期限付き予約、自動解除、複数顧客の優先順位管理
+
+#### 6. 帳票・レポート機能の不備
+
+**A. 在庫報告書**
+- 月次・週次の店舗別在庫報告書
+- 商品別回転率分析レポート
+- デッドストック・スロームービング分析
+
+**B. 個体追跡レポート**
+- 入荷から販売までの個体ライフサイクルレポート
+- 不良品・返品・修理の統計レポート
+- 店舗間移動実績レポート
+
+### 次回の優先実装タスク（重要度順）
+
+#### 【最優先】実装必須機能
+1. **個体ステータス履歴管理** - frame_status_history テーブル追加
+2. **QRコード生成・印刷機能** - 実用性に直結
+3. **個体と受注の完全紐付け管理** - ビジネスロジック強化
+4. **期限付き予約管理** - 実際の店舗運用で必須
+
+#### 【高優先】業務効率化機能
+5. **高度な個体検索機能** - 複合条件検索対応
+6. **個体自動割り当て機能** - 受注効率化
+7. **店舗間移動管理** - チェーン店運用で必須
+8. **QRコードスキャン機能** - 現場作業効率化
+
+#### 【中優先】分析・レポート機能
+9. **在庫分析ダッシュボード** - 経営判断支援
+10. **個体ライフサイクル分析** - 業務改善データ
+11. **帳票・レポート機能** - 本部・店長向け情報
+12. **製作工程統合機能** - 全体フロー最適化
+
+### 技術的実装の追加要件
+
+#### データベーススキーマ拡張
+```sql
+-- 個体ステータス履歴テーブル
+CREATE TABLE frame_status_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  frame_id UUID NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+  old_status frame_status,
+  new_status frame_status NOT NULL,
+  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  changed_by UUID NOT NULL REFERENCES users(id),
+  change_reason VARCHAR(255),
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- QRコード情報テーブル
+CREATE TABLE frame_qr_codes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  frame_id UUID NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+  qr_code_data TEXT NOT NULL,
+  qr_code_image_url VARCHAR(255),
+  generated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  printed_at TIMESTAMP WITH TIME ZONE,
+  print_count INTEGER DEFAULT 0
+);
+
+-- 個体予約管理テーブル
+CREATE TABLE frame_reservations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  frame_id UUID NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+  reserved_by UUID NOT NULL REFERENCES users(id),
+  reserved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  status VARCHAR(20) DEFAULT 'active', -- 'active', 'expired', 'cancelled', 'confirmed'
+  priority INTEGER DEFAULT 1,
+  notes TEXT
+);
+
+-- 店舗間移動履歴テーブル
+CREATE TABLE frame_transfers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  frame_id UUID NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+  from_store_id UUID NOT NULL REFERENCES stores(id),
+  to_store_id UUID NOT NULL REFERENCES stores(id),
+  from_location VARCHAR(100),
+  to_location VARCHAR(100),
+  transfer_type VARCHAR(20) NOT NULL, -- 'transfer', 'loan', 'return'
+  initiated_by UUID NOT NULL REFERENCES users(id),
+  approved_by UUID REFERENCES users(id),
+  shipped_at TIMESTAMP WITH TIME ZONE,
+  received_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'shipped', 'received', 'cancelled'
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 品質検査記録テーブル
+CREATE TABLE frame_quality_records (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  frame_id UUID NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+  inspection_type VARCHAR(20) NOT NULL, -- 'incoming', 'periodic', 'repair', 'customer_return'
+  inspector_id UUID NOT NULL REFERENCES users(id),
+  inspection_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  quality_status VARCHAR(20) NOT NULL, -- 'excellent', 'good', 'acceptable', 'defective', 'unrepairable'
+  defect_details TEXT,
+  repair_required BOOLEAN DEFAULT FALSE,
+  repair_cost DECIMAL(8,2),
+  notes TEXT
+);
+```
+
+#### フロントエンド新規ページ要件
+- `QRCodeManagementPage.tsx` - QRコード生成・印刷管理
+- `FrameReservationManagementPage.tsx` - 個体予約管理
+- `FrameStatusHistoryPage.tsx` - 個体履歴追跡
+- `InventoryAnalyticsPage.tsx` - 在庫分析ダッシュボード
+- `FrameTransferManagementPage.tsx` - 店舗間移動管理
+- `QualityInspectionPage.tsx` - 品質検査記録管理
+
+#### バックエンドAPI拡張要件
+```typescript
+// 新規APIエンドポイント要件
+GET    /api/frames/qr-code/:frameId           // QRコード生成・取得
+POST   /api/frames/qr-codes/print             // QRコード一括印刷
+POST   /api/frames/:frameId/reserve           // 個体予約
+DELETE /api/frames/:frameId/reserve           // 予約解除
+GET    /api/frames/reservations               // 予約一覧取得
+POST   /api/frames/:frameId/transfer          // 店舗間移動開始
+PUT    /api/frames/transfers/:transferId      // 移動状況更新
+GET    /api/frames/:frameId/history           // 個体履歴取得
+POST   /api/frames/:frameId/quality-check     // 品質検査記録
+GET    /api/frames/analytics/inventory        // 在庫分析データ
+GET    /api/frames/search/advanced            // 高度検索
+```
+
+### システム完成度の再評価
+
+#### 🔄 個体管理システム完成度: 40%
+- ✅ 基本的な個体登録・検索機能: 完了
+- ❌ ライフサイクル管理: 未実装
+- ❌ QRコード機能: 未実装
+- ❌ 予約・取り置き管理: 未実装
+- ❌ 分析・レポート機能: 未実装
+
+#### 🎯 システム全体完成度: 65%（下方修正）
+- 顧客・受注・発注管理: 完了
+- 個体管理: 基礎のみ（重要機能多数不足）
+- 入庫・製作・お渡し管理: 未実装
+- レポート・分析機能: 基礎実装済み
+- システム運用機能: Docker環境完全構築
+
+**重要**: 個体管理システムは眼鏡店の核心業務のため、上記の追加要件実装なしには実用性が大幅に欠ける状況です。
+
+## 2025年9月9日 個体管理エラー解決と要件定義完全見直し作業記録
+
+### 本日完了した重要な作業
+
+#### 1. 個体登録エラーの根本原因解決
+
+**問題**: 「個体登録に失敗しました」400 Bad Request エラー
+**根本原因**: フロントエンドで生成される個体番号が既存データと重複
+**解決内容**:
+
+**A. エラー原因の段階的特定**
+- バックエンドログ分析 → FRAME_SERVICE で個体管理品一括登録エラー
+- API手動テスト → 「個体番号「FRAME001-ST01-20250909-001」は既に存在します」
+- データベース確認 → 同一個体番号が既に5件存在
+
+**B. 個体番号生成ロジックの改善**
+修正前: `{productCode}-{storeCode}-{YYYYMMDD}-{序号}`
+修正後: `{productCode}-{storeCode}-{YYYYMMDD}-{HHMMSS}-{randomPart}-{sequenceNo}`
+
+```typescript
+// 修正した個体番号生成関数
+const generateSerialNumber = (index: number): string => {
+  const now = new Date();
+  const timestamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const timepart = now.toISOString().slice(11, 19).replace(/:/g, ''); // HHMMSS
+  const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const storeCode = 'ST01';
+  const productCode = purchaseOrderItem?.product?.productCode || 'UNKNOWN';
+  
+  return `${productCode}-${storeCode}-${timestamp}-${timepart}-${randomPart}-${String(index).padStart(3, '0')}`;
+};
+```
+
+**C. 修正結果**
+- 重複リスクを大幅に削減
+- 例: `FRAME001-ST01-20250909-084951-456-001`（時分秒+ランダム要素追加）
+
+#### 2. 個体管理システム要件定義の包括的見直し
+
+**実施内容**: 現在の実装と実際の眼鏡店業務を詳細比較し、重要な機能漏れを特定
+
+**A. 発見した重要な機能不足（6大分野）**
+
+1. **個体ライフサイクル管理**
+   - ステータス変更履歴追跡機能不足
+   - 受注との紐付け管理不完全
+   - 品質検査・修理記録システム未実装
+
+2. **QRコード・バーコードシステム**
+   - QRコード生成・印刷機能未実装
+   - スキャン機能未実装（ボタンのみ存在）
+   - モバイル対応不備
+
+3. **高度検索・分析機能**
+   - 複合条件検索不可（現在は基本検索のみ）
+   - 売上・在庫分析機能不足
+   - 回転率・デッドストック分析未実装
+
+4. **予約・在庫移動管理**
+   - 期限付き予約システム未実装
+   - 店舗間移動履歴管理不備
+   - 複数顧客優先順位管理不可
+
+5. **システム統合**
+   - 受注時自動個体割り当て未実装
+   - 在庫不足時自動発注連携なし
+   - レンズ加工工程統合不完全
+
+6. **接客・レポート支援**
+   - 個体比較・提案機能なし
+   - 帳票・分析レポート不備
+   - 経営判断支援データ不足
+
+**B. システム完成度の大幅な下方修正**
+- 個体管理システム: 100% → **40%**
+- システム全体: 85% → **65%**
+- 理由: 実用性に必要な重要機能の大幅不足が判明
+
+#### 3. 技術的な追加要件の詳細設計
+
+**A. データベーススキーマ拡張要件**
+- `frame_status_history` - 個体ステータス履歴
+- `frame_qr_codes` - QRコード情報管理
+- `frame_reservations` - 期限付き予約管理
+- `frame_transfers` - 店舗間移動履歴
+- `frame_quality_records` - 品質検査記録
+
+**B. API拡張要件（10個の新規エンドポイント）**
+```typescript
+GET    /api/frames/qr-code/:frameId           // QRコード生成・取得
+POST   /api/frames/qr-codes/print             // QRコード一括印刷
+POST   /api/frames/:frameId/reserve           // 個体予約
+GET    /api/frames/reservations               // 予約一覧取得
+GET    /api/frames/:frameId/history           // 個体履歴取得
+GET    /api/frames/analytics/inventory        // 在庫分析データ
+// 他4個のエンドポイント
+```
+
+**C. フロントエンド新規ページ要件**
+- `QRCodeManagementPage.tsx` - QRコード管理
+- `FrameReservationManagementPage.tsx` - 予約管理
+- `InventoryAnalyticsPage.tsx` - 在庫分析
+- `FrameStatusHistoryPage.tsx` - 個体履歴
+- 他2個のページ
+
+### 現在のシステム状態
+
+#### ✅ 完全動作確認済み
+- **Docker環境**: 全6コンテナが安定稼働
+- **認証システム**: manager001 / password / STORE001 で正常動作
+- **個体番号生成**: 重複リスク大幅削減、ユニーク性向上済み
+- **基本的な個体管理**: 登録・検索・一覧表示機能
+
+#### 📊 データベース状況
+- frames テーブル: 6件の個体データ
+- customers テーブル: 5名の顧客データ
+- products テーブル: 43商品（フレーム、レンズ、コンタクト、アクセサリー、補聴器）
+- stores テーブル: 6店舗データ
+
+#### 🎯 次回セッションの開始手順
+
+1. **Docker環境確認**
+```bash
+cd /home/h-hiramitsu/projects/test_kokyaku
+docker-compose ps  # 全コンテナHealthy確認
+```
+
+2. **システム動作確認**
+```bash
+# 認証テスト
+curl -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userCode":"manager001","password":"password","storeCode":"STORE001"}'
+```
+
+3. **個体管理機能テスト**
+- http://localhost:3000 にアクセス
+- manager001 / password / STORE001 でログイン
+- 入庫管理 → 発注書PO250909AAA004 → 個体番号割り当てテスト
+
+### 次回の最優先実装タスク
+
+#### 【最優先】実装必須機能（実用性に直結）
+1. **個体ステータス履歴管理テーブル追加** - 誰がいつ何を変更したかの完全追跡
+2. **QRコード生成・印刷機能実装** - 現場作業効率化に必須
+3. **期限付き予約管理システム** - 実際の店舗運用で必要
+4. **個体と受注の完全紐付け管理** - ビジネスロジック強化
+
+#### 【高優先】業務効率化機能
+5. **高度な個体検索機能** - 複合条件検索対応
+6. **個体自動割り当て機能** - 受注処理の自動化
+7. **店舗間移動管理システム** - チェーン店運用で必須
+
+### 技術的重要事項
+
+#### 開発原則の再確認
+- **型定義の完全同期**: frontend/src/types/index.ts ⟷ backend/src/types/index.ts
+- **実データテスト**: モックデータは使用せず、Docker環境で実API統合
+- **エラーハンドリング**: 統一されたApiResponseフォーマット維持
+- **認証・認可**: JWT + ロールベース権限管理の継続
+
+#### 現在のプロダクションレディ機能
+- 顧客管理システム（完全CRUD + 処方箋 + 画像管理）
+- 受注管理システム（処方箋統合 + 自動ステータス管理）
+- 発注管理システム（一覧 + 履歴 + 仕入原価計算）
+- 入庫管理システム（基本機能のみ）
+- 個体管理システム（基本機能のみ、重要機能は今後実装）
+
+### 重要な認識
+
+**現在の個体管理システムは、眼鏡店の実業務で使用するには機能不足**が明らかになりました。特に以下の点で大幅な改善が必要です：
+
+1. **QRコード機能**: 現場での効率的な個体識別に必須
+2. **履歴管理**: いつ誰が何をしたかの完全な追跡機能
+3. **予約管理**: 顧客の検討期間中の個体取り置き
+4. **高度検索**: 条件に合う個体の迅速な特定
+5. **分析機能**: 在庫状況と売れ筋の把握
+
+これらの機能実装により、システムが実用レベルに到達し、実際の眼鏡店業務で活用できるようになります。

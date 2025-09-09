@@ -33,20 +33,20 @@ class RateLimiter {
           blockDuration: isDevelopment ? 300 : 900,
         });
 
-    // 一般API制限（15分間に100回まで）
+    // 一般API制限（開発環境: 5分間に1000回, 本番: 15分間に100回）
     this.apiLimiter = useRedis
       ? new RateLimiterRedis({
           storeClient: redis as any,
           keyPrefix: 'api_limit',
-          points: 100,
-          duration: 900,
-          blockDuration: 60, // 1分ブロック
+          points: isDevelopment ? 1000 : 100,
+          duration: isDevelopment ? 300 : 900,
+          blockDuration: isDevelopment ? 10 : 60,
         })
       : new RateLimiterMemory({
           keyPrefix: 'api_limit',
-          points: 100,
-          duration: 900,
-          blockDuration: 60,
+          points: isDevelopment ? 1000 : 100,
+          duration: isDevelopment ? 300 : 900,
+          blockDuration: isDevelopment ? 10 : 60,
         });
 
     // トークンリフレッシュ制限（1時間に10回まで）

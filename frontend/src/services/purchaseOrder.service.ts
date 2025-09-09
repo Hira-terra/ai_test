@@ -87,6 +87,30 @@ class PurchaseOrderService {
   }
 
   /**
+   * 発注を送信（ステータスをsentに更新）
+   */
+  async sendPurchaseOrder(purchaseOrderId: string): Promise<ApiResponse<PurchaseOrder>> {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders/${purchaseOrderId}/send`,
+        {
+          method: 'PUT',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('発注送信エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 発注履歴を取得
    */
   async getPurchaseOrderHistory(params?: {
@@ -201,27 +225,6 @@ class PurchaseOrderService {
     }
   }
 
-  /**
-   * 発注を送信
-   */
-  async sendPurchaseOrder(id: string): Promise<ApiResponse<PurchaseOrder>> {
-    try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders/${id}/send`, {
-        method: 'POST',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('発注送信エラー:', error);
-      throw error;
-    }
-  }
 
   /**
    * 仕入先一覧を取得

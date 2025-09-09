@@ -64,7 +64,24 @@ export class ReceivingModel {
       logger.info(`[${operationId}] 入庫待ち発注一覧取得`, { storeId });
       const result = await db.query(query, params);
       
-      return result.rows;
+      // スネークケースからキャメルケースへ変換
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        purchaseOrderNumber: row.purchase_order_number,
+        supplierId: row.supplier_id,
+        supplierName: row.supplier_name,
+        supplier: {
+          id: row.supplier_id,
+          name: row.supplier_name
+        },
+        orderDate: row.order_date,
+        expectedDeliveryDate: row.expected_delivery_date,
+        status: row.status,
+        totalAmount: parseFloat(row.total_amount),
+        notes: row.notes,
+        itemCount: parseInt(row.item_count),
+        pendingQuantity: parseInt(row.pending_quantity)
+      }));
     } catch (error: any) {
       logger.error(`[${operationId}] 入庫待ち発注一覧取得エラー`, error);
       throw new DatabaseError('入庫待ち発注一覧の取得に失敗しました');
@@ -104,6 +121,7 @@ export class ReceivingModel {
           poi.product_id,
           p.product_code,
           p.name as product_name,
+          p.management_type,
           poi.quantity as ordered_quantity,
           poi.unit_cost,
           poi.total_cost,
@@ -115,16 +133,66 @@ export class ReceivingModel {
         INNER JOIN products p ON poi.product_id = p.id
         LEFT JOIN receiving_items ri ON poi.id = ri.purchase_order_item_id
         WHERE poi.purchase_order_id = $1
-        GROUP BY poi.id, poi.product_id, p.product_code, p.name, 
+        GROUP BY poi.id, poi.product_id, p.product_code, p.name, p.management_type,
                  poi.quantity, poi.unit_cost, poi.total_cost, 
                  poi.specifications, poi.notes
       `;
       
       const itemsResult = await db.query(itemsQuery, [purchaseOrderId]);
 
+      // スネークケースからキャメルケースへ変換
+      const purchaseOrder = poResult.rows[0];
+      const transformedPO = {
+        id: purchaseOrder.id,
+        purchaseOrderNumber: purchaseOrder.purchase_order_number,
+        supplierId: purchaseOrder.supplier_id,
+        supplier: {
+          id: purchaseOrder.supplier_id,
+          name: purchaseOrder.supplier_name,
+          supplierCode: purchaseOrder.supplier_code
+        },
+        storeId: purchaseOrder.store_id,
+        store: {
+          id: purchaseOrder.store_id,
+          name: purchaseOrder.store_name
+        },
+        orderDate: purchaseOrder.order_date,
+        expectedDeliveryDate: purchaseOrder.expected_delivery_date,
+        actualDeliveryDate: purchaseOrder.actual_delivery_date,
+        status: purchaseOrder.status,
+        subtotalAmount: parseFloat(purchaseOrder.subtotal_amount || 0),
+        taxAmount: parseFloat(purchaseOrder.tax_amount || 0),
+        totalAmount: parseFloat(purchaseOrder.total_amount || 0),
+        notes: purchaseOrder.notes,
+        sentAt: purchaseOrder.sent_at,
+        confirmedAt: purchaseOrder.confirmed_at,
+        createdBy: purchaseOrder.created_by,
+        createdAt: purchaseOrder.created_at,
+        updatedAt: purchaseOrder.updated_at
+      };
+
+      const transformedItems = itemsResult.rows.map((item: any) => ({
+        id: item.id,
+        productId: item.product_id,
+        product: {
+          id: item.product_id,
+          productCode: item.product_code,
+          name: item.product_name,
+          managementType: item.management_type
+        },
+        quantity: parseInt(item.ordered_quantity), // フロントエンドとの互換性のため追加
+        orderedQuantity: parseInt(item.ordered_quantity),
+        unitCost: parseFloat(item.unit_cost),
+        totalCost: parseFloat(item.total_cost),
+        specifications: item.specifications,
+        notes: item.notes,
+        receivedQuantity: parseInt(item.received_quantity),
+        pendingQuantity: parseInt(item.pending_quantity)
+      }));
+
       return {
-        purchaseOrder: poResult.rows[0],
-        items: itemsResult.rows
+        ...transformedPO,
+        items: transformedItems
       };
     } catch (error: any) {
       if (error instanceof NotFoundError) {

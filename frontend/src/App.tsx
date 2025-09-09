@@ -19,6 +19,8 @@ import StoreListPage from '@/pages/stores/StoreListPage';
 import UserMasterPage from '@/pages/UserMasterPage';
 import PurchaseOrderListPage from '@/pages/PurchaseOrderListPage';
 import PurchaseOrderHistoryPage from '@/pages/PurchaseOrderHistoryPage';
+import { ReceivingManagementPage } from '@/pages/ReceivingManagementPage';
+import { IndividualManagementPage } from '@/pages/IndividualManagementPage';
 
 const App: React.FC = () => {
   return (
@@ -44,6 +46,8 @@ const App: React.FC = () => {
               <Route path="orders/new" element={<OrderEntryPage />} />
               <Route path="purchase-orders" element={<PurchaseOrderListPage />} />
               <Route path="purchase-orders/history" element={<PurchaseOrderHistoryPage />} />
+              <Route path="receiving" element={<ReceivingManagementPage />} />
+              <Route path="individual-management" element={<IndividualManagementPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="cash-register" element={<CashRegisterPage />} />
               <Route path="products" element={<ProductMasterPage />} />

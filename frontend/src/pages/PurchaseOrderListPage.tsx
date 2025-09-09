@@ -23,22 +23,35 @@ import {
   MenuItem,
   Checkbox,
   Alert,
-  CircularProgress
+  CircularProgress,
+  IconButton,
+  Collapse,
+  Card,
+  CardContent,
+  Stack,
+  Divider
 } from '@mui/material';
-import { LocalShipping as PurchaseOrderIcon, Add as AddIcon } from '@mui/icons-material';
-import { Order, Supplier } from '../types';
+import { 
+  LocalShipping as PurchaseOrderIcon, 
+  Add as AddIcon,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
+  Send as SendIcon
+} from '@mui/icons-material';
+import { Order, Supplier, OrderItem } from '../types';
 import { purchaseOrderService } from '../services/purchaseOrder.service';
 import { useAuth } from '../contexts/AuthContext';
 
-const PurchaseOrderListPage: React.FC = () => {
+export default function PurchaseOrderListPage() {
   const { user } = useAuth();
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedOrderItems, setSelectedOrderItems] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   
   // 発注作成ダイアログ
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -46,6 +59,9 @@ const PurchaseOrderListPage: React.FC = () => {
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // 発注確認画面での最終選択
+  const [finalSelectedItems, setFinalSelectedItems] = useState<Set<string>>(new Set());
 
   // フィルター
   const [customerFilter, setCustomerFilter] = useState('');
@@ -81,27 +97,56 @@ const PurchaseOrderListPage: React.FC = () => {
     }
   };
 
-  const handleOrderSelection = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
-    );
+  const handleOrderItemSelection = (orderId: string, itemId: string) => {
+    const key = `${orderId}-${itemId}`;
+    setSelectedOrderItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
   };
 
-  const handleSelectAll = () => {
-    if (selectedOrders.length === availableOrders.length) {
-      setSelectedOrders([]);
-    } else {
-      setSelectedOrders(availableOrders.map(order => order.id));
-    }
+  const handleSelectAllItems = (orderId: string) => {
+    const order = availableOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const orderItemKeys = order.items?.map(item => `${orderId}-${item.id}`) || [];
+    const allSelected = orderItemKeys.every(key => selectedOrderItems.has(key));
+
+    setSelectedOrderItems(prev => {
+      const newSet = new Set(prev);
+      if (allSelected) {
+        orderItemKeys.forEach(key => newSet.delete(key));
+      } else {
+        orderItemKeys.forEach(key => newSet.add(key));
+      }
+      return newSet;
+    });
+  };
+
+  const handleToggleOrderExpand = (orderId: string) => {
+    setExpandedOrders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
   };
 
   const handleOpenConfirmDialog = () => {
-    if (!selectedSupplierId || selectedOrders.length === 0) {
-      setError('仕入先と受注を選択してください');
+    if (!selectedSupplierId || selectedOrderItems.size === 0) {
+      setError('仕入先と商品を選択してください');
       return;
     }
+    // 選択されたアイテムを最終選択にコピー
+    setFinalSelectedItems(new Set(selectedOrderItems));
     setCreateDialogOpen(false);
     setConfirmDialogOpen(true);
   };
@@ -111,21 +156,29 @@ const PurchaseOrderListPage: React.FC = () => {
       setCreating(true);
       setError(null);
 
+      // 最終選択された商品から受注IDを抽出（重複を除く）
+      const orderIds = new Set<string>();
+      finalSelectedItems.forEach(key => {
+        const orderId = key.substring(0, 36);
+        orderIds.add(orderId);
+      });
+
       const result = await purchaseOrderService.createPurchaseOrder({
         supplierId: selectedSupplierId,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         notes: notes || undefined,
-        orderIds: selectedOrders
+        orderIds: Array.from(orderIds)
       });
 
       if (result.success && result.data) {
         setSuccess('発注を作成しました: ' + result.data.purchaseOrderNumber);
         setConfirmDialogOpen(false);
-        setSelectedOrders([]);
+        setSelectedOrderItems(new Set());
+        setFinalSelectedItems(new Set());
         setSelectedSupplierId('');
         setExpectedDeliveryDate('');
         setNotes('');
-        await loadData(); // データを再読み込み
+        await loadData();
       } else {
         const errorMessage = typeof result.error === 'string' 
           ? result.error 
@@ -140,18 +193,97 @@ const PurchaseOrderListPage: React.FC = () => {
     }
   };
 
-  const getSelectedOrdersTotal = () => {
-    return selectedOrders.reduce((total, orderId) => {
+  const getSelectedItemsTotal = () => {
+    let total = 0;
+    selectedOrderItems.forEach(key => {
+      // UUID形式のキーを正しく分割
+      const orderId = key.substring(0, 36);
+      const itemId = key.substring(37);
       const order = availableOrders.find(o => o.id === orderId);
-      const orderCostTotal = order?.items?.reduce((itemTotal, item) => {
-        return itemTotal + ((item.product?.costPrice || 0) * item.quantity);
-      }, 0) || 0;
-      return total + orderCostTotal;
-    }, 0);
+      const item = order?.items?.find(i => i.id === itemId);
+      if (item) {
+        total += (item.product?.costPrice || 0) * item.quantity;
+      }
+    });
+    return total;
   };
 
-  const getSelectedOrdersDetails = () => {
-    return availableOrders.filter(order => selectedOrders.includes(order.id));
+  const getSelectedItemsDetails = () => {
+    const details: Array<{order: Order, item: OrderItem}> = [];
+    
+    selectedOrderItems.forEach(key => {
+      // UUID形式のキーを正しく分割（36文字のUUID + ハイフン + 36文字のUUID）
+      const orderId = key.substring(0, 36);
+      const itemId = key.substring(37);
+      
+      const order = availableOrders.find(o => o.id === orderId);
+      const item = order?.items?.find(i => i.id === itemId);
+      
+      if (order && item) {
+        details.push({ order, item });
+      }
+    });
+    
+    return details;
+  };
+
+  const getFinalSelectedItemsDetails = () => {
+    const details: Array<{order: Order, item: OrderItem, key: string}> = [];
+    
+    finalSelectedItems.forEach(key => {
+      // UUID形式のキーを正しく分割
+      const orderId = key.substring(0, 36);
+      const itemId = key.substring(37);
+      
+      const order = availableOrders.find(o => o.id === orderId);
+      const item = order?.items?.find(i => i.id === itemId);
+      
+      if (order && item) {
+        details.push({ order, item, key });
+      }
+    });
+    
+    return details;
+  };
+
+  const getFinalSelectedItemsTotal = () => {
+    let total = 0;
+    finalSelectedItems.forEach(key => {
+      // UUID形式のキーを正しく分割
+      const orderId = key.substring(0, 36);
+      const itemId = key.substring(37);
+      const order = availableOrders.find(o => o.id === orderId);
+      const item = order?.items?.find(i => i.id === itemId);
+      if (item) {
+        total += (item.product?.costPrice || 0) * item.quantity;
+      }
+    });
+    return total;
+  };
+
+  const handleFinalItemSelection = (key: string) => {
+    setFinalSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const getProductCategoryChip = (category?: string) => {
+    const categoryMap = {
+      lens: { label: 'レンズ', color: 'primary' as const },
+      frame: { label: 'フレーム', color: 'secondary' as const },
+      contact: { label: 'コンタクト', color: 'info' as const },
+      accessory: { label: 'アクセサリー', color: 'success' as const },
+      hearing_aid: { label: '補聴器', color: 'warning' as const }
+    };
+    
+    const categoryInfo = categoryMap[category as keyof typeof categoryMap] || { label: category || '不明', color: 'default' as const };
+    return <Chip label={categoryInfo.label} color={categoryInfo.color} size="small" />;
   };
 
   const getOrderStatusChip = (status: string) => {
@@ -208,44 +340,43 @@ const PurchaseOrderListPage: React.FC = () => {
 
       {/* フィルター */}
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          絞り込み
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={3}>
             <TextField
-              fullWidth
-              label="顧客名"
+              label="顧客名で検索"
               value={customerFilter}
               onChange={(e) => setCustomerFilter(e.target.value)}
+              fullWidth
+              size="small"
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} sm={3}>
             <TextField
-              fullWidth
-              label="受注日(開始)"
+              label="受注日から"
               type="date"
               value={dateFromFilter}
               onChange={(e) => setDateFromFilter(e.target.value)}
+              fullWidth
+              size="small"
               InputLabelProps={{ shrink: true }}
             />
           </Grid>
-          <Grid item xs={12} md={3}>
+          <Grid item xs={12} sm={3}>
             <TextField
-              fullWidth
-              label="受注日(終了)"
+              label="受注日まで"
               type="date"
               value={dateToFilter}
               onChange={(e) => setDateToFilter(e.target.value)}
+              fullWidth
+              size="small"
               InputLabelProps={{ shrink: true }}
             />
           </Grid>
-          <Grid item xs={12} md={2}>
-            <Button
-              fullWidth
-              variant="outlined"
+          <Grid item xs={12} sm={3}>
+            <Button 
+              variant="outlined" 
               onClick={loadData}
-              sx={{ height: '56px' }}
+              fullWidth
             >
               検索
             </Button>
@@ -253,83 +384,154 @@ const PurchaseOrderListPage: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* 発注待ち受注一覧 */}
-      <Paper sx={{ mb: 3 }}>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">
-            発注待ち受注一覧 ({availableOrders.length}件)
-          </Typography>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6">
+          発注待ち受注一覧（{availableOrders.length}件）
+        </Typography>
+        <Box>
+          {selectedOrderItems.size > 0 && (
+            <Typography variant="body2" sx={{ mr: 2, display: 'inline' }}>
+              選択中: {selectedOrderItems.size}商品
+            </Typography>
+          )}
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            disabled={selectedOrders.length === 0}
             onClick={() => setCreateDialogOpen(true)}
+            disabled={selectedOrderItems.size === 0}
           >
-            発注作成 ({selectedOrders.length}件選択中)
+            選択商品を発注
           </Button>
         </Box>
+      </Box>
 
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    checked={selectedOrders.length === availableOrders.length && availableOrders.length > 0}
-                    indeterminate={selectedOrders.length > 0 && selectedOrders.length < availableOrders.length}
-                    onChange={handleSelectAll}
-                  />
-                </TableCell>
-                <TableCell>受注番号</TableCell>
-                <TableCell>顧客名</TableCell>
-                <TableCell>受注日</TableCell>
-                <TableCell>金額</TableCell>
-                <TableCell>ステータス</TableCell>
-                <TableCell>商品</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {availableOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    発注待ちの受注はありません
-                  </TableCell>
-                </TableRow>
-              ) : (
-                availableOrders.map((order) => (
-                  <TableRow key={order.id} hover>
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={selectedOrders.includes(order.id)}
-                        onChange={() => handleOrderSelection(order.id)}
-                      />
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell />
+              <TableCell>受注番号</TableCell>
+              <TableCell>顧客名</TableCell>
+              <TableCell>受注日</TableCell>
+              <TableCell>ステータス</TableCell>
+              <TableCell align="right">商品数</TableCell>
+              <TableCell align="right">仕入金額</TableCell>
+              <TableCell align="center">選択</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {availableOrders.map((order) => {
+              const isExpanded = expandedOrders.has(order.id);
+              const orderItems = order.items || [];
+              const orderItemKeys = orderItems.map(item => `${order.id}-${item.id}`);
+              const selectedCount = orderItemKeys.filter(key => selectedOrderItems.has(key)).length;
+              const allSelected = selectedCount === orderItems.length && orderItems.length > 0;
+              const partiallySelected = selectedCount > 0 && selectedCount < orderItems.length;
+              
+              return (
+                <React.Fragment key={order.id}>
+                  <TableRow>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleToggleOrderExpand(order.id)}
+                      >
+                        {isExpanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                      </IconButton>
                     </TableCell>
                     <TableCell>{order.orderNumber}</TableCell>
-                    <TableCell>{order.customer?.fullName || '不明'}</TableCell>
+                    <TableCell>{order.customer?.lastName} {order.customer?.firstName}</TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
-                    <TableCell>{formatCurrency(order.totalAmount)}</TableCell>
                     <TableCell>{getOrderStatusChip(order.status)}</TableCell>
-                    <TableCell>
-                      {order.items?.map(item => item.product?.name).join(', ') || '商品情報なし'}
+                    <TableCell align="right">{orderItems.length}</TableCell>
+                    <TableCell align="right">
+                      {formatCurrency(
+                        orderItems.reduce((total, item) => 
+                          total + ((item.product?.costPrice || 0) * item.quantity), 0
+                        )
+                      )}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={partiallySelected}
+                        onChange={() => handleSelectAllItems(order.id)}
+                      />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                  <TableRow>
+                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 2 }}>
+                          <Typography variant="h6" gutterBottom>
+                            商品明細
+                          </Typography>
+                          <Table size="small">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>選択</TableCell>
+                                <TableCell>カテゴリー</TableCell>
+                                <TableCell>商品コード</TableCell>
+                                <TableCell>商品名</TableCell>
+                                <TableCell>ブランド</TableCell>
+                                <TableCell align="right">数量</TableCell>
+                                <TableCell align="right">仕入単価</TableCell>
+                                <TableCell align="right">仕入金額</TableCell>
+                                <TableCell>処方箋</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {orderItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedOrderItems.has(`${order.id}-${item.id}`)}
+                                      onChange={() => handleOrderItemSelection(order.id, item.id)}
+                                    />
+                                  </TableCell>
+                                  <TableCell>{getProductCategoryChip(item.product?.category)}</TableCell>
+                                  <TableCell>{item.product?.productCode || '-'}</TableCell>
+                                  <TableCell>{item.product?.name || '-'}</TableCell>
+                                  <TableCell>{item.product?.brand || '-'}</TableCell>
+                                  <TableCell align="right">{item.quantity}</TableCell>
+                                  <TableCell align="right">
+                                    {formatCurrency(item.product?.costPrice || 0)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {formatCurrency((item.product?.costPrice || 0) * item.quantity)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {item.prescriptionId ? (
+                                      <Chip label="処方箋あり" size="small" color="info" />
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* 発注作成ダイアログ */}
-      <Dialog
-        open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>発注作成</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Alert severity="info">
+                {selectedOrderItems.size}個の商品が選択されています
+              </Alert>
+            </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth required>
                 <InputLabel>仕入先</InputLabel>
@@ -348,180 +550,138 @@ const PurchaseOrderListPage: React.FC = () => {
             </Grid>
             <Grid item xs={12}>
               <TextField
-                fullWidth
-                label="納期予定日"
+                label="納品予定日"
                 type="date"
                 value={expectedDeliveryDate}
                 onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                fullWidth
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
-                fullWidth
                 label="備考"
-                multiline
-                rows={3}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                fullWidth
+                multiline
+                rows={3}
               />
-            </Grid>
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
-                選択中の受注: {selectedOrders.length}件
-              </Typography>
-              <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                {selectedOrders.map(orderId => {
-                  const order = availableOrders.find(o => o.id === orderId);
-                  return order ? (
-                    <Typography key={orderId} variant="body2">
-                      • {order.orderNumber} - {order.customer?.fullName} ({formatCurrency(order.totalAmount)})
-                    </Typography>
-                  ) : null;
-                })}
-              </Box>
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>
-            キャンセル
-          </Button>
-          <Button
-            onClick={handleOpenConfirmDialog}
-            variant="contained"
-            color="primary"
-            disabled={!selectedSupplierId || selectedOrders.length === 0}
-          >
-            次へ（確認画面）
+          <Button onClick={() => setCreateDialogOpen(false)}>キャンセル</Button>
+          <Button variant="contained" onClick={handleOpenConfirmDialog} disabled={!selectedSupplierId}>
+            確認画面へ
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 発注確認ダイアログ */}
-      <Dialog
-        open={confirmDialogOpen}
-        onClose={() => setConfirmDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>発注内容の確認</DialogTitle>
+      <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle>発注内容確認</DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            以下の内容で発注を作成します。内容をご確認ください。
-          </Alert>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" fontWeight="bold">
-                仕入先情報
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Card>
+              <CardContent>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="textSecondary">仕入先</Typography>
+                    <Typography variant="body1">
+                      {suppliers.find(s => s.id === selectedSupplierId)?.name}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="textSecondary">納品予定日</Typography>
+                    <Typography variant="body1">
+                      {expectedDeliveryDate || '未定'}
+                    </Typography>
+                  </Grid>
+                  {notes && (
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="textSecondary">備考</Typography>
+                      <Typography variant="body1">{notes}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            <Typography variant="h6">発注商品明細</Typography>
+            <Alert severity="info" sx={{ mb: 1 }}>
+              フレーム等で在庫品がある場合は、発注不要な商品のチェックを外してください
+            </Alert>
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">発注</TableCell>
+                    <TableCell>受注番号</TableCell>
+                    <TableCell>顧客名</TableCell>
+                    <TableCell>カテゴリー</TableCell>
+                    <TableCell>商品コード</TableCell>
+                    <TableCell>商品名</TableCell>
+                    <TableCell align="right">数量</TableCell>
+                    <TableCell align="right">仕入単価</TableCell>
+                    <TableCell align="right">仕入金額</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {getSelectedItemsDetails().map(({ order, item }) => {
+                    const key = `${order.id}-${item.id}`;
+                    const isSelected = finalSelectedItems.has(key);
+                    return (
+                      <TableRow key={key}>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => handleFinalItemSelection(key)}
+                            color="primary"
+                          />
+                        </TableCell>
+                        <TableCell>{order.orderNumber}</TableCell>
+                        <TableCell>{order.customer?.lastName} {order.customer?.firstName}</TableCell>
+                        <TableCell>{getProductCategoryChip(item.product?.category)}</TableCell>
+                        <TableCell>{item.product?.productCode || '-'}</TableCell>
+                        <TableCell>{item.product?.name || '-'}</TableCell>
+                        <TableCell align="right">{item.quantity}</TableCell>
+                        <TableCell align="right">
+                          {formatCurrency(item.product?.costPrice || 0)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {formatCurrency((item.product?.costPrice || 0) * item.quantity)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <Divider />
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" color="text.secondary">
+                選択済み: {finalSelectedItems.size}商品
               </Typography>
-              <Box sx={{ pl: 2, mt: 1 }}>
-                <Typography variant="body2">
-                  {suppliers.find(s => s.id === selectedSupplierId)?.name} 
-                  ({suppliers.find(s => s.id === selectedSupplierId)?.supplierCode})
-                </Typography>
-                {expectedDeliveryDate && (
-                  <Typography variant="body2">
-                    納期予定日: {expectedDeliveryDate}
-                  </Typography>
-                )}
-                {notes && (
-                  <Typography variant="body2">
-                    備考: {notes}
-                  </Typography>
-                )}
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" fontWeight="bold">
-                発注明細 ({selectedOrders.length}件)
+              <Typography variant="h6">
+                発注合計金額: {formatCurrency(getFinalSelectedItemsTotal())}
               </Typography>
-              <TableContainer sx={{ mt: 1, maxHeight: 300 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>受注番号</TableCell>
-                      <TableCell>顧客名</TableCell>
-                      <TableCell>商品コード</TableCell>
-                      <TableCell>商品名</TableCell>
-                      <TableCell align="right">数量</TableCell>
-                      <TableCell align="right">仕入単価</TableCell>
-                      <TableCell align="right">仕入金額</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {getSelectedOrdersDetails().map((order) => (
-                      order.items?.map((item, itemIndex) => (
-                        <TableRow key={`${order.id}-${itemIndex}`}>
-                          {itemIndex === 0 && (
-                            <>
-                              <TableCell rowSpan={order.items?.length || 1}>
-                                {order.orderNumber}
-                              </TableCell>
-                              <TableCell rowSpan={order.items?.length || 1}>
-                                {order.customer?.fullName}
-                              </TableCell>
-                            </>
-                          )}
-                          <TableCell>{item.product?.productCode || '不明'}</TableCell>
-                          <TableCell>{item.product?.name || '不明'}</TableCell>
-                          <TableCell align="right">{item.quantity}</TableCell>
-                          <TableCell align="right">
-                            {formatCurrency(item.product?.costPrice || 0)}
-                          </TableCell>
-                          <TableCell align="right">
-                            {formatCurrency((item.product?.costPrice || 0) * item.quantity)}
-                          </TableCell>
-                        </TableRow>
-                      )) || []
-                    )).flat()}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                bgcolor: 'grey.100',
-                p: 2,
-                borderRadius: 1
-              }}>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  合計仕入金額
-                </Typography>
-                <Typography variant="h6" color="primary">
-                  {formatCurrency(getSelectedOrdersTotal())}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+            </Box>
+          </Stack>
         </DialogContent>
         <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)}>戻る</Button>
           <Button 
-            onClick={() => {
-              setConfirmDialogOpen(false);
-              setCreateDialogOpen(true);
-            }}
-          >
-            戻る
-          </Button>
-          <Button
+            variant="contained" 
+            color="primary" 
             onClick={handleCreatePurchaseOrder}
-            variant="contained"
-            color="primary"
-            disabled={creating}
+            disabled={creating || finalSelectedItems.size === 0}
           >
-            {creating ? <CircularProgress size={20} /> : '発注を確定'}
+            {creating ? <CircularProgress size={24} /> : '発注確定'}
           </Button>
         </DialogActions>
       </Dialog>
     </Box>
   );
-};
-
-export default PurchaseOrderListPage;
+}

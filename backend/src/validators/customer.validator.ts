@@ -287,6 +287,10 @@ export const prescriptionSchema = Joi.object({
     .min(0)
     .max(180)
     .allow(null)
+    .when('rightEyeCylinder', {
+      is: Joi.exist(),
+      then: Joi.allow(null)
+    })
     .messages({
       'number.base': '右眼軸は数値で入力してください',
       'number.min': '右眼軸は0以上で入力してください',
@@ -294,13 +298,13 @@ export const prescriptionSchema = Joi.object({
     }),
 
   rightEyeVision: Joi.number()
-    .min(0)
+    .min(0.01)
     .max(2)
-    .precision(1)
+    .precision(2)
     .allow(null)
     .messages({
       'number.base': '右眼視力は数値で入力してください',
-      'number.min': '右眼視力は0以上で入力してください',
+      'number.min': '右眼視力は0.01以上で入力してください',
       'number.max': '右眼視力は2.0以下で入力してください'
     }),
 
@@ -331,6 +335,10 @@ export const prescriptionSchema = Joi.object({
     .min(0)
     .max(180)
     .allow(null)
+    .when('leftEyeCylinder', {
+      is: Joi.exist(),
+      then: Joi.allow(null)
+    })
     .messages({
       'number.base': '左眼軸は数値で入力してください',
       'number.min': '左眼軸は0以上で入力してください',
@@ -338,24 +346,24 @@ export const prescriptionSchema = Joi.object({
     }),
 
   leftEyeVision: Joi.number()
-    .min(0)
+    .min(0.01)
     .max(2)
-    .precision(1)
+    .precision(2)
     .allow(null)
     .messages({
       'number.base': '左眼視力は数値で入力してください',
-      'number.min': '左眼視力は0以上で入力してください',
+      'number.min': '左眼視力は0.01以上で入力してください',
       'number.max': '左眼視力は2.0以下で入力してください'
     }),
 
   pupilDistance: Joi.number()
-    .min(40)
+    .min(20)
     .max(85)
     .precision(1)
     .allow(null)
     .messages({
       'number.base': '瞳孔間距離は数値で入力してください',
-      'number.min': '瞳孔間距離は40mm以上で入力してください',
+      'number.min': '瞳孔間距離は20mm以上で入力してください',
       'number.max': '瞳孔間距離は85mm以下で入力してください'
     }),
 

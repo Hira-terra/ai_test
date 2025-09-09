@@ -27,7 +27,8 @@ import {
 import { 
   History as HistoryIcon, 
   Visibility as ViewIcon,
-  LocalShipping as ShippingIcon
+  LocalShipping as ShippingIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import { PurchaseOrder, Supplier, PurchaseOrderStatus } from '../types';
 import { purchaseOrderService } from '../services/purchaseOrder.service';
@@ -41,6 +42,8 @@ const PurchaseOrderHistoryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   // フィルター
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -90,6 +93,27 @@ const PurchaseOrderHistoryPage: React.FC = () => {
     }
   };
 
+  const handleSendPurchaseOrder = async (purchaseOrderId: string) => {
+    try {
+      setSending(purchaseOrderId);
+      setError(null);
+
+      const result = await purchaseOrderService.sendPurchaseOrder(purchaseOrderId);
+      
+      if (result.success) {
+        setSuccess('発注を送信しました');
+        await loadData(); // データを再読み込み
+      } else {
+        throw new Error(result.error?.message || '発注送信に失敗しました');
+      }
+    } catch (error: any) {
+      console.error('発注送信エラー:', error);
+      setError('発注送信に失敗しました: ' + (error.message || '不明なエラー'));
+    } finally {
+      setSending(null);
+    }
+  };
+
   const getStatusChip = (status: PurchaseOrderStatus) => {
     const statusMap: Record<PurchaseOrderStatus, { label: string; color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' }> = {
       draft: { label: '下書き', color: 'default' as const },
@@ -126,8 +150,14 @@ const PurchaseOrderHistoryPage: React.FC = () => {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
+          {success}
         </Alert>
       )}
 
@@ -236,9 +266,22 @@ const PurchaseOrderHistoryPage: React.FC = () => {
                           startIcon={<ViewIcon />}
                           size="small"
                           onClick={() => handleViewDetail(order.id)}
+                          sx={{ mr: 1 }}
                         >
                           詳細
                         </Button>
+                        {order.status === 'draft' && (
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            size="small"
+                            startIcon={<SendIcon />}
+                            onClick={() => handleSendPurchaseOrder(order.id)}
+                            disabled={sending === order.id}
+                          >
+                            {sending === order.id ? <CircularProgress size={16} /> : '発注送信'}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

@@ -44,6 +44,7 @@ import {
   Clear as ClearIcon,
   Cancel as CancelIcon,
   Refresh as RefreshIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 import { 
   Product, 
@@ -70,6 +71,7 @@ const OrderEntryPage: React.FC = () => {
   // データ状態
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [latestPrescription, setLatestPrescription] = useState<Prescription | null>(null); // 前回処方箋（コピー用）
   const [products, setProducts] = useState<Product[]>([]);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [orderItems, setOrderItems] = useState<Omit<OrderItem, 'id' | 'orderId'>[]>([]);
@@ -181,14 +183,16 @@ const OrderEntryPage: React.FC = () => {
             setActiveStep(1); // 顧客が選択済みなので商品選択ステップへ
           }
 
-          // @REAL_API: 最新処方箋取得
+          // @REAL_API: 最新処方箋取得（コピー用として保持、自動設定はしない）
           const prescriptionResponse = await customerService.getCustomerPrescriptions(customerId);
           if (prescriptionResponse.success && prescriptionResponse.data && prescriptionResponse.data.length > 0) {
             // 最新の処方箋を取得（日付順でソート）
-            const latestPrescription = prescriptionResponse.data.sort((a: any, b: any) => 
+            const latest = prescriptionResponse.data.sort((a: any, b: any) => 
               new Date(b.measuredDate).getTime() - new Date(a.measuredDate).getTime()
             )[0];
-            setPrescription(latestPrescription);
+            setLatestPrescription(latest);
+            // 処方箋は自動設定せず、空の状態で開始
+            setPrescription(null);
           }
         } else {
           // customerIdが無い場合は顧客選択ステップから開始
@@ -324,18 +328,25 @@ const OrderEntryPage: React.FC = () => {
     setCustomer(selectedCustomer);
     setActiveStep(1);
 
-    // 選択した顧客の最新処方箋を取得
+    // 最新処方箋を取得（コピー用として保持、自動設定はしない）
     try {
       const prescriptionResponse = await customerService.getCustomerPrescriptions(selectedCustomer.id);
       if (prescriptionResponse.success && prescriptionResponse.data && prescriptionResponse.data.length > 0) {
         // 最新の処方箋を取得（日付順でソート）
-        const latestPrescription = prescriptionResponse.data.sort((a: any, b: any) => 
+        const latest = prescriptionResponse.data.sort((a: any, b: any) => 
           new Date(b.measuredDate).getTime() - new Date(a.measuredDate).getTime()
         )[0];
-        setPrescription(latestPrescription);
+        setLatestPrescription(latest);
+        // 処方箋は自動設定せず、空の状態で開始
+        setPrescription(null);
+      } else {
+        setLatestPrescription(null);
+        setPrescription(null);
       }
     } catch (err: any) {
       console.warn('処方箋情報の取得に失敗:', err.message);
+      setLatestPrescription(null);
+      setPrescription(null);
     }
   };
 
@@ -375,6 +386,30 @@ const OrderEntryPage: React.FC = () => {
       defaultDeliveryDate.setDate(defaultDeliveryDate.getDate() + 14);
       setDeliveryDate(defaultDeliveryDate.toISOString().split('T')[0]);
     }
+  };
+
+  // 前回処方箋のコピー
+  const copyLatestPrescription = () => {
+    if (!latestPrescription) {
+      alert('コピーする処方箋がありません');
+      return;
+    }
+
+    setPrescriptionForm({
+      rightEyeSphere: latestPrescription.rightEyeSphere?.toString() || '',
+      rightEyeCylinder: latestPrescription.rightEyeCylinder?.toString() || '',
+      rightEyeAxis: latestPrescription.rightEyeAxis?.toString() || '',
+      rightEyeVision: latestPrescription.rightEyeVision?.toString() || '',
+      leftEyeSphere: latestPrescription.leftEyeSphere?.toString() || '',
+      leftEyeCylinder: latestPrescription.leftEyeCylinder?.toString() || '',
+      leftEyeAxis: latestPrescription.leftEyeAxis?.toString() || '',
+      leftEyeVision: latestPrescription.leftEyeVision?.toString() || '',
+      pupilDistance: latestPrescription.pupilDistance?.toString() || '',
+      measuredDate: new Date().toISOString().split('T')[0], // 測定日は今日の日付にする
+      notes: latestPrescription.notes || ''
+    });
+
+    alert(`前回処方箋（${latestPrescription.measuredDate.split('T')[0]}測定）をコピーしました`);
   };
 
   // 処方箋保存
@@ -1107,7 +1142,21 @@ const OrderEntryPage: React.FC = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>処方箋入力</DialogTitle>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">処方箋入力</Typography>
+            {latestPrescription && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={copyLatestPrescription}
+                startIcon={<ContentCopyIcon />}
+              >
+                前回処方箋コピー（{latestPrescription.measuredDate.split('T')[0]}測定）
+              </Button>
+            )}
+          </Box>
+        </DialogTitle>
         <DialogContent>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {/* 右眼 */}
