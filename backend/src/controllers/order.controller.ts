@@ -48,6 +48,8 @@ export class OrderController {
         status: req.query.status as any,
         fromDate: req.query.fromDate as string,
         toDate: req.query.toDate as string,
+        orderNumber: req.query.orderNumber as string,
+        customerName: req.query.customerName as string,
         page: validation.data.page,
         limit: validation.data.limit,
         storeId: req.query.storeId as string || (req as any).user?.storeId

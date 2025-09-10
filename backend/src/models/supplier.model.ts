@@ -171,4 +171,13 @@ export class SupplierModel {
     const result = await this.db.query(query, values);
     return result.rows[0] || null;
   }
+
+  /**
+   * 仕入先を削除
+   */
+  async delete(id: string): Promise<boolean> {
+    const query = 'DELETE FROM suppliers WHERE id = $1';
+    const result = await this.db.query(query, [id]);
+    return (result.rowCount ?? 0) > 0;
+  }
 }

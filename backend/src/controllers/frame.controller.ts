@@ -199,6 +199,144 @@ export class FrameController {
   }
 
   /**
+   * フレーム個体のステータス更新
+   * PUT /api/frames/:id/status
+   */
+  async updateFrameStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status, orderId, changeReason, notes } = req.body;
+      const changedBy = req.user?.userId;
+      
+      if (!id) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: 'FRAME_ID_REQUIRED',
+            message: 'フレームIDが必要です'
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+      
+      if (!changedBy) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: '認証が必要です'
+          }
+        };
+        res.status(401).json(response);
+        return;
+      }
+
+      if (!status) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: 'STATUS_REQUIRED',
+            message: 'ステータスが必要です'
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      const frame = await frameService.updateFrameStatus(
+        id,
+        status as FrameStatus,
+        changedBy,
+        orderId,
+        changeReason,
+        notes
+      );
+
+      if (!frame) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: 'FRAME_NOT_FOUND',
+            message: 'フレーム個体が見つかりません'
+          }
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      const response: ApiResponse = {
+        success: true,
+        data: frame
+      };
+
+      res.json(response);
+      logger.info('[FRAME_CONTROLLER] ステータス更新成功', {
+        userId: changedBy,
+        frameId: id,
+        newStatus: status
+      });
+
+    } catch (error: any) {
+      logger.error('[FRAME_CONTROLLER] ステータス更新エラー', { error });
+      
+      const response: ApiResponse = {
+        success: false,
+        error: {
+          code: 'UPDATE_STATUS_FAILED',
+          message: error.message || 'ステータス更新に失敗しました'
+        }
+      };
+
+      res.status(400).json(response);
+    }
+  }
+
+  /**
+   * フレーム個体のステータス履歴取得
+   * GET /api/frames/:id/history
+   */
+  async getFrameStatusHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        const response: ApiResponse = {
+          success: false,
+          error: {
+            code: 'FRAME_ID_REQUIRED',
+            message: 'フレームIDが必要です'
+          }
+        };
+        res.status(400).json(response);
+        return;
+      }
+      
+      const history = await frameService.getFrameStatusHistory(id);
+
+      const response: ApiResponse = {
+        success: true,
+        data: history
+      };
+
+      res.json(response);
+
+    } catch (error: any) {
+      logger.error('[FRAME_CONTROLLER] ステータス履歴取得エラー', { error });
+      
+      const response: ApiResponse = {
+        success: false,
+        error: {
+          code: 'GET_HISTORY_FAILED',
+          message: error.message || 'ステータス履歴の取得に失敗しました'
+        }
+      };
+
+      res.status(400).json(response);
+    }
+  }
+
+  /**
    * 個体番号検索
    * GET /api/frames/serial/:serialNumber
    */

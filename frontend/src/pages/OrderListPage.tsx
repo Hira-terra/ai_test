@@ -66,8 +66,10 @@ const OrderListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
   const [paymentFilter, setPaymentFilter] = useState<PaymentMethod | ''>('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // デフォルトで今日の受注を表示
+  const today = new Date().toISOString().split('T')[0];
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(today);
   
   // UI状態
   const [loading, setLoading] = useState(false);
@@ -98,10 +100,15 @@ const OrderListPage: React.FC = () => {
   });
   const [prescriptionLoading, setPrescriptionLoading] = useState(false);
 
-  // 初期化 - 検索条件がある場合のみページ変更時にデータ読み込み
+  // 初期化 - ページ読み込み時に今日の受注を表示
   useEffect(() => {
-    const hasSearchConditions = searchQuery || statusFilter || paymentFilter || dateFrom || dateTo;
-    if (hasSearchConditions && pagination.page > 1) {
+    loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ページ変更時のデータ読み込み
+  useEffect(() => {
+    if (pagination.page > 1) {
       loadOrders();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

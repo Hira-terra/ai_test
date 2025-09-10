@@ -534,4 +534,165 @@ export class ReceivingModel {
       throw new DatabaseError('入庫詳細の取得に失敗しました');
     }
   }
+
+  /**
+   * 入庫済み発注一覧を取得（買掛一覧用）
+   */
+  static async getReceivedPurchaseOrders(params?: {
+    storeId?: string;
+    supplierId?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    const operationId = `receiving_received_orders_${Date.now()}`;
+    
+    try {
+      let query = `
+        SELECT DISTINCT
+          po.id,
+          po.purchase_order_number,
+          po.supplier_id,
+          s.name as supplier_name,
+          s.supplier_code,
+          po.store_id,
+          st.name as store_name,
+          po.order_date,
+          po.expected_delivery_date,
+          po.actual_delivery_date,
+          po.status,
+          po.subtotal_amount,
+          po.tax_amount,
+          po.total_amount,
+          po.notes,
+          po.sent_at,
+          po.confirmed_at,
+          po.created_at,
+          po.updated_at,
+          COUNT(poi.id) as item_count
+        FROM purchase_orders po
+        INNER JOIN suppliers s ON po.supplier_id = s.id
+        INNER JOIN stores st ON po.store_id = st.id
+        INNER JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
+        WHERE po.status IN ('delivered', 'partially_delivered')
+      `;
+      
+      const queryParams: any[] = [];
+      let paramIndex = 1;
+      
+      // フィルタ条件の追加
+      if (params?.storeId) {
+        query += ` AND po.store_id = $${paramIndex}`;
+        queryParams.push(params.storeId);
+        paramIndex++;
+      }
+      
+      if (params?.supplierId) {
+        query += ` AND po.supplier_id = $${paramIndex}`;
+        queryParams.push(params.supplierId);
+        paramIndex++;
+      }
+      
+      if (params?.status && ['delivered', 'partially_delivered'].includes(params.status)) {
+        query += ` AND po.status = $${paramIndex}`;
+        queryParams.push(params.status);
+        paramIndex++;
+      }
+      
+      if (params?.fromDate) {
+        query += ` AND po.actual_delivery_date >= $${paramIndex}`;
+        queryParams.push(params.fromDate);
+        paramIndex++;
+      }
+      
+      if (params?.toDate) {
+        query += ` AND po.actual_delivery_date <= $${paramIndex}`;
+        queryParams.push(params.toDate);
+        paramIndex++;
+      }
+      
+      query += `
+        GROUP BY po.id, s.name, s.supplier_code, st.name
+        ORDER BY po.actual_delivery_date DESC, po.created_at DESC
+      `;
+      
+      const result = await db.query(query, queryParams);
+      
+      // 各発注の明細情報も取得
+      const ordersWithItems = await Promise.all(
+        result.rows.map(async (order: any) => {
+          const itemsQuery = `
+            SELECT 
+              poi.id,
+              poi.product_id,
+              p.name as product_name,
+              p.product_code,
+              poi.quantity,
+              poi.unit_cost,
+              poi.total_cost,
+              poi.specifications,
+              poi.notes
+            FROM purchase_order_items poi
+            INNER JOIN products p ON poi.product_id = p.id
+            WHERE poi.purchase_order_id = $1
+            ORDER BY poi.created_at
+          `;
+          
+          const itemsResult = await db.query(itemsQuery, [order.id]);
+          
+          return {
+            id: order.id,
+            purchaseOrderNumber: order.purchase_order_number,
+            supplierId: order.supplier_id,
+            supplier: {
+              id: order.supplier_id,
+              name: order.supplier_name,
+              supplierCode: order.supplier_code
+            },
+            storeId: order.store_id,
+            store: {
+              id: order.store_id,
+              name: order.store_name
+            },
+            orderDate: order.order_date,
+            expectedDeliveryDate: order.expected_delivery_date,
+            actualDeliveryDate: order.actual_delivery_date,
+            status: order.status,
+            subtotalAmount: parseFloat(order.subtotal_amount || '0'),
+            taxAmount: parseFloat(order.tax_amount || '0'),
+            totalAmount: parseFloat(order.total_amount || '0'),
+            notes: order.notes,
+            sentAt: order.sent_at,
+            confirmedAt: order.confirmed_at,
+            createdAt: order.created_at,
+            updatedAt: order.updated_at,
+            items: itemsResult.rows.map((item: any) => ({
+              id: item.id,
+              productId: item.product_id,
+              quantity: item.quantity,
+              unitCost: parseFloat(item.unit_cost || '0'),
+              totalCost: parseFloat(item.total_cost || '0'),
+              specifications: item.specifications,
+              notes: item.notes,
+              product: {
+                id: item.product_id,
+                name: item.product_name,
+                productCode: item.product_code
+              }
+            }))
+          };
+        })
+      );
+      
+      logger.info(`[${operationId}] 入庫済み発注一覧取得完了`, { 
+        count: ordersWithItems.length,
+        params 
+      });
+      
+      return ordersWithItems;
+    } catch (error: any) {
+      logger.error(`[${operationId}] 入庫済み発注一覧取得エラー`, error);
+      throw new DatabaseError('入庫済み発注一覧の取得に失敗しました');
+    }
+  }
 }

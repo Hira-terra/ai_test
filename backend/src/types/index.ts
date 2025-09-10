@@ -159,6 +159,61 @@ export const API_ENDPOINTS = {
     
     // 品質チェック
     QUALITY_CHECK: (id: string) => `/receiving/${id}/quality-check`
+  },
+
+  // 製作進捗管理
+  PRODUCTION: {
+    BASE: '/production',
+    LIST: '/production',
+    DETAIL: (id: string) => `/production/${id}`,
+    CREATE: '/production',
+    UPDATE: (id: string) => `/production/${id}`,
+    DELETE: (id: string) => `/production/${id}`,
+    
+    // ステータス更新
+    UPDATE_STATUS: (id: string) => `/production/${id}/status`,
+    UPDATE_STEP: (id: string) => `/production/${id}/step`,
+    
+    // 担当者割り当て
+    ASSIGN_TECHNICIAN: (id: string) => `/production/${id}/assign`,
+    
+    // 工程履歴
+    STEP_HISTORY: (id: string) => `/production/${id}/history`,
+    ADD_STEP_HISTORY: (id: string) => `/production/${id}/history`,
+    
+    // 品質検査
+    QUALITY_CHECK: (id: string) => `/production/${id}/quality-check`,
+    
+    // 進捗統計
+    STATISTICS: '/production/statistics',
+    TECHNICIAN_WORKLOAD: '/production/technician-workload'
+  },
+
+  // お渡し・決済管理
+  DELIVERY: {
+    BASE: '/delivery',
+    LIST: '/delivery',
+    DETAIL: (id: string) => `/delivery/${id}`,
+    CREATE: '/delivery',
+    UPDATE: (id: string) => `/delivery/${id}`,
+    DELETE: (id: string) => `/delivery/${id}`,
+    
+    // ステータス更新
+    UPDATE_STATUS: (id: string) => `/delivery/${id}/status`,
+    
+    // お渡し処理
+    DELIVER: (id: string) => `/delivery/${id}/deliver`,
+    SCHEDULE: (id: string) => `/delivery/${id}/schedule`,
+    
+    // 決済処理
+    PAYMENT: (id: string) => `/delivery/${id}/payment`,
+    PAYMENT_RECORDS: (id: string) => `/delivery/${id}/payments`,
+    
+    // 領収書
+    RECEIPT: (id: string) => `/delivery/${id}/receipt`,
+    
+    // お渡し統計
+    STATISTICS: '/delivery/statistics'
   }
 } as const;
 
@@ -442,6 +497,153 @@ export type PaymentMethod = 'cash' | 'credit' | 'electronic' | 'receivable';
 
 // 支払タイミングの追加
 export type PaymentTiming = 'order_time' | 'delivery_time';
+
+// 製作進捗管理関連型定義
+export type ProductionStatus = 
+  | 'waiting'           // 製作待ち
+  | 'lens_processing'   // レンズ加工中
+  | 'frame_assembly'    // フレーム組み立て中
+  | 'quality_check'     // 品質検査中
+  | 'packaging'         // 包装中
+  | 'completed'         // 製作完了
+  | 'on_hold'          // 製作保留
+  | 'rework_required';  // 再作業要
+
+export type ProductionStep = 
+  | 'lens_cutting'      // レンズカット
+  | 'lens_grinding'     // レンズ研磨
+  | 'lens_coating'      // コーティング
+  | 'frame_adjustment'  // フレーム調整
+  | 'assembly'          // 組み立て
+  | 'final_check'       // 最終検査
+  | 'cleaning'          // クリーニング
+  | 'packaging';        // 梱包
+
+export interface ProductionOrder {
+  id: UUID;
+  orderId: UUID;
+  order?: Order;
+  productionNumber: string;  // 製作番号
+  status: ProductionStatus;
+  currentStep: ProductionStep;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  startedAt?: DateString;
+  expectedCompletionDate: DateString;
+  actualCompletionDate?: DateString;
+  assignedTechnician?: UUID;
+  assignedTechnicianName?: string;
+  notes?: string;
+  qualityCheckResult?: 'passed' | 'failed' | 'pending';
+  steps: ProductionStep[];
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export interface ProductionStepHistory {
+  id: UUID;
+  productionOrderId: UUID;
+  step: ProductionStep;
+  status: 'started' | 'completed' | 'failed' | 'skipped';
+  startedAt: DateString;
+  completedAt?: DateString;
+  technicianId: UUID;
+  technicianName: string;
+  notes?: string;
+  qualityScore?: number;  // 1-5点での品質評価
+  defects?: string[];     // 不具合項目
+  reworkReason?: string;  // 再作業理由
+}
+
+export interface ProductionSearchParams {
+  storeId?: string;
+  status?: ProductionStatus;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  assignedTechnician?: string;
+  fromDate?: string;
+  toDate?: string;
+  customerName?: string;
+  productionNumber?: string;
+}
+
+// お渡し・決済管理関連型定義
+export type DeliveryStatus = 
+  | 'ready'             // お渡し準備完了
+  | 'scheduled'         // お渡し予定
+  | 'delivered'         // お渡し完了
+  | 'partial_delivery'  // 一部お渡し
+  | 'cancelled'         // お渡しキャンセル
+  | 'returned';         // 返品
+
+export interface DeliveryOrder {
+  id: UUID;
+  orderId: UUID;
+  order?: Order;
+  deliveryNumber: string;  // お渡し番号
+  status: DeliveryStatus;
+  scheduledDate?: DateString;
+  actualDeliveryDate?: DateString;
+  deliveredBy?: UUID;
+  deliveredByName?: string;
+  customerNotified: boolean;
+  deliveryMethod: 'store_pickup' | 'home_delivery' | 'mail';
+  deliveryAddress?: {
+    zipCode?: string;
+    prefecture?: string;
+    city?: string;
+    address1?: string;
+    address2?: string;
+  };
+  notes?: string;
+  qualityCheckPassed: boolean;
+  finalAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  paymentStatus: 'unpaid' | 'partial' | 'paid' | 'refunded';
+  paymentMethod?: PaymentMethod;
+  paymentDate?: DateString;
+  receiptIssued: boolean;
+  warrantyPeriod: number; // 保証期間（月数）
+  warrantyStartDate?: DateString;
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export interface DeliveryItem {
+  id: UUID;
+  deliveryOrderId: UUID;
+  orderItemId: UUID;
+  orderItem?: OrderItem;
+  deliveredQuantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  serialNumber?: string; // 個体管理の場合
+  qualityCheckNotes?: string;
+}
+
+export interface PaymentRecord {
+  id: UUID;
+  deliveryOrderId: UUID;
+  paymentDate: DateString;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  paymentTiming: PaymentTiming;
+  receiptNumber?: string;
+  notes?: string;
+  processedBy: UUID;
+  processedByName?: string;
+  createdAt: DateString;
+}
+
+export interface DeliverySearchParams {
+  storeId?: string;
+  status?: DeliveryStatus;
+  paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'refunded';
+  deliveryMethod?: 'store_pickup' | 'home_delivery' | 'mail';
+  fromDate?: string;
+  toDate?: string;
+  customerName?: string;
+  deliveryNumber?: string;
+}
 
 export interface OrderItem {
   id: UUID;

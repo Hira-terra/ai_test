@@ -37,6 +37,7 @@ import {
   Info as InfoIcon,
   Warning as WarningIcon,
   QrCode as QrCodeIcon,
+  Print as PrintIcon,
 } from '@mui/icons-material';
 import { receivingAPIService } from '../services/api/receiving.service';
 import { supplierAPIService } from '../services/api/supplier.service';
@@ -44,6 +45,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { PurchaseOrder, PurchaseOrderStatus, Supplier, QualityStatus, PurchaseOrderItem } from '../types';
 import { IndividualItemAssignmentDialog } from '../components/IndividualItemAssignmentDialog';
 import { frameService } from '../services/frame.service';
+import QRCodePrintDialog from '../components/QRCodePrintDialog';
 
 type ChipColor = 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
 
@@ -85,6 +87,8 @@ export const ReceivingManagementPage: React.FC = () => {
   const [selectedIndividualItem, setSelectedIndividualItem] = useState<PurchaseOrderItem | null>(null);
   const [assignedIndividuals, setAssignedIndividuals] = useState<any[]>([]);
   const [showAssignedResults, setShowAssignedResults] = useState(false);
+  const [qrPrintDialog, setQrPrintDialog] = useState(false);
+  const [framesForPrint, setFramesForPrint] = useState<any[]>([]);
 
   useEffect(() => {
     loadSuppliers();
@@ -253,6 +257,9 @@ export const ReceivingManagementPage: React.FC = () => {
       // 付番結果を保存して表示
       setAssignedIndividuals(createdFrames || items);
       setShowAssignedResults(true);
+      
+      // QRコード印刷用にデータを保存
+      setFramesForPrint(createdFrames || items);
       
       setIndividualAssignmentDialog(false);
       setSelectedIndividualItem(null);
@@ -580,11 +587,29 @@ export const ReceivingManagementPage: React.FC = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
+          <Button
+            startIcon={<PrintIcon />}
+            onClick={() => {
+              setQrPrintDialog(true);
+            }}
+            variant="outlined"
+            sx={{ mr: 'auto' }}
+          >
+            QRコード印刷
+          </Button>
           <Button onClick={() => setShowAssignedResults(false)} variant="contained">
             確認
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* QRコード印刷ダイアログ */}
+      <QRCodePrintDialog
+        open={qrPrintDialog}
+        onClose={() => setQrPrintDialog(false)}
+        frames={framesForPrint}
+        storeCode={user?.store?.storeCode || 'ST01'}
+      />
     </Box>
   );
 };

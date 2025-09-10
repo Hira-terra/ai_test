@@ -91,7 +91,6 @@ const CustomerSearchPage: React.FC = () => {
     setIsLoading(true);
     try {
       const searchParam = params || searchParams;
-      // @MOCK_TO_API: モックサービス経由でのデータ取得
       const response = await customerService.searchCustomers(searchParam);
       
       if (response.success && response.data) {
@@ -158,7 +157,6 @@ const CustomerSearchPage: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
-      {/* @MOCK_UI: モック使用時のバナー表示 */}
       
       {/* Search Section - Compact Design */}
       <Card sx={{ mb: 3, p: 3 }}>

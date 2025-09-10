@@ -25,6 +25,9 @@ router.post(
 // 入庫履歴取得
 router.get('/history', receivingController.getReceivingHistory);
 
+// 入庫済み発注一覧取得（買掛一覧用）
+router.get('/received-orders', receivingController.getReceivedOrders);
+
 // 入庫詳細取得
 router.get('/:receivingId', receivingController.getReceivingDetail);
 

@@ -53,7 +53,9 @@ import {
   Prescription, 
   PaymentMethod,
   OrderItem,
-  OrderStatus 
+  OrderStatus,
+  Discount,
+  OrderDiscount
 } from '@/types';
 import { customerService } from '@/services/customer.service';
 import { productService } from '@/services/product.service';
@@ -112,6 +114,118 @@ const OrderEntryPage: React.FC = () => {
   // 商品選択用の状態
   const [selectedProductCategory, setSelectedProductCategory] = useState<string>('all');
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+
+  // 値引き関連の状態
+  const [availableDiscounts, setAvailableDiscounts] = useState<Discount[]>([]);
+  const [appliedDiscounts, setAppliedDiscounts] = useState<OrderDiscount[]>([]);
+  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
+  // 将来的に使用予定
+  // const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(null);
+  // const [discountCalculationResults, setDiscountCalculationResults] = useState<DiscountCalculationResult[]>([]);
+  const [requiresManagerApproval, setRequiresManagerApproval] = useState(false);
+
+  // モック値引きマスタデータ（後でAPIから取得に変更）
+  const mockDiscounts: Discount[] = [
+    {
+      id: 'D001',
+      discountCode: 'PERCENT_5',
+      name: '5%割引',
+      type: 'percentage',
+      value: 5,
+      minOrderAmount: 0,
+      maxDiscountAmount: 5000,
+      applicableTo: 'order',
+      requiresManagerApproval: false,
+      currentUses: 0,
+      isActive: true,
+      displayOrder: 1,
+      validFrom: '2024-01-01T00:00:00Z',
+      validTo: '2024-12-31T23:59:59Z',
+      description: '通常の5%割引',
+      createdBy: 'admin001',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 'D002',
+      discountCode: 'PERCENT_10',
+      name: '10%割引',
+      type: 'percentage',
+      value: 10,
+      minOrderAmount: 10000,
+      maxDiscountAmount: 10000,
+      applicableTo: 'order',
+      requiresManagerApproval: true,
+      currentUses: 0,
+      isActive: true,
+      displayOrder: 2,
+      validFrom: '2024-01-01T00:00:00Z',
+      validTo: '2024-12-31T23:59:59Z',
+      description: '1万円以上で10%割引（店長承認必要）',
+      createdBy: 'admin001',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 'D003',
+      discountCode: 'AMOUNT_1000',
+      name: '1,000円引き',
+      type: 'amount',
+      value: 1000,
+      minOrderAmount: 5000,
+      applicableTo: 'order',
+      requiresManagerApproval: false,
+      currentUses: 0,
+      isActive: true,
+      displayOrder: 3,
+      validFrom: '2024-01-01T00:00:00Z',
+      validTo: '2024-12-31T23:59:59Z',
+      description: '5,000円以上で1,000円引き',
+      createdBy: 'admin001',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 'D004',
+      discountCode: 'SENIOR',
+      name: 'シニア割引（15%）',
+      type: 'percentage',
+      value: 15,
+      minOrderAmount: 0,
+      maxDiscountAmount: 15000,
+      applicableTo: 'order',
+      requiresManagerApproval: false,
+      currentUses: 0,
+      isActive: true,
+      displayOrder: 4,
+      validFrom: '2024-01-01T00:00:00Z',
+      validTo: '2024-12-31T23:59:59Z',
+      description: '65歳以上のお客様限定',
+      createdBy: 'admin001',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z'
+    },
+    {
+      id: 'D005',
+      discountCode: 'STAFF',
+      name: 'スタッフ割引（20%）',
+      type: 'percentage',
+      value: 20,
+      minOrderAmount: 0,
+      maxDiscountAmount: 20000,
+      applicableTo: 'order',
+      requiresManagerApproval: true,
+      currentUses: 0,
+      isActive: true,
+      displayOrder: 5,
+      validFrom: '2024-01-01T00:00:00Z',
+      validTo: '2024-12-31T23:59:59Z',
+      description: '店舗スタッフ専用割引（店長承認必要）',
+      createdBy: 'admin001',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z'
+    }
+  ];
   
   // 商品カテゴリー定義
   const productCategories = [
@@ -170,11 +284,90 @@ const OrderEntryPage: React.FC = () => {
     })()
   };
 
+  // 値引き計算関数
+  const calculateDiscount = (discount: Discount, orderAmount: number): number => {
+    if (orderAmount < discount.minOrderAmount) return 0;
+    
+    let calculatedAmount = 0;
+    if (discount.type === 'percentage') {
+      calculatedAmount = orderAmount * (discount.value / 100);
+      if (discount.maxDiscountAmount && calculatedAmount > discount.maxDiscountAmount) {
+        calculatedAmount = discount.maxDiscountAmount;
+      }
+    } else if (discount.type === 'amount') {
+      calculatedAmount = discount.value;
+    }
+    
+    return Math.floor(calculatedAmount); // 小数点切り捨て
+  };
+
+  // 値引き適用処理
+  const applyDiscount = (discount: Discount) => {
+    const orderSubtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
+    const discountAmount = calculateDiscount(discount, orderSubtotal);
+    
+    if (discountAmount === 0) {
+      setError(`この値引きの適用には最低${discount.minOrderAmount.toLocaleString()}円以上のご注文が必要です`);
+      return;
+    }
+
+    const orderDiscount: OrderDiscount = {
+      id: `OD_${Date.now()}`,
+      orderId: '', // 受注確定時に設定
+      discountId: discount.id,
+      discount: discount,
+      discountCode: discount.discountCode,
+      discountName: discount.name,
+      discountType: discount.type,
+      discountValue: discount.value,
+      originalAmount: orderSubtotal,
+      discountAmount: discountAmount,
+      discountedAmount: orderSubtotal - discountAmount,
+      approvedBy: discount.requiresManagerApproval ? undefined : 'current_user', // ログインユーザーのID
+      approvedAt: discount.requiresManagerApproval ? undefined : new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+
+    setAppliedDiscounts(prev => [...prev, orderDiscount]);
+    setShowDiscountDialog(false);
+    
+    if (discount.requiresManagerApproval) {
+      setRequiresManagerApproval(true);
+    }
+  };
+
+  // 値引き削除処理
+  const removeDiscount = (orderDiscountId: string) => {
+    setAppliedDiscounts(prev => prev.filter(d => d.id !== orderDiscountId));
+    
+    // 承認が必要な値引きがなくなったら承認フラグを解除
+    const hasApprovalRequired = appliedDiscounts
+      .filter(d => d.id !== orderDiscountId)
+      .some(d => d.discount?.requiresManagerApproval && !d.approvedBy);
+    
+    setRequiresManagerApproval(hasApprovalRequired);
+  };
+
+  // 合計金額計算
+  const calculateTotals = () => {
+    const subtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
+    const totalDiscountAmount = appliedDiscounts.reduce((total, discount) => total + discount.discountAmount, 0);
+    const finalAmount = subtotal - totalDiscountAmount;
+    
+    return {
+      subtotal,
+      totalDiscountAmount,
+      finalAmount: Math.max(0, finalAmount) // 負の値にならないように
+    };
+  };
+
   // 初期化
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
       try {
+        // 値引きマスタの初期化
+        setAvailableDiscounts(mockDiscounts);
         // @MOCK_TO_API: 顧客情報取得
         if (customerId) {
           const customerResponse = await customerService.getCustomerById(customerId);
@@ -225,6 +418,7 @@ const OrderEntryPage: React.FC = () => {
     };
 
     initializeData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
 
   // 商品追加
@@ -237,6 +431,7 @@ const OrderEntryPage: React.FC = () => {
       frame: selectedFrame,
       quantity: 1,
       unitPrice: unitPrice,
+      discountAmount: 0, // 初期値は0
       totalPrice: unitPrice,
       prescriptionId: prescription?.id || undefined, // 処方箋IDを追加
       notes: selectedFrame ? `${selectedFrame.serialNumber} (${selectedFrame.color})` : undefined // 空文字ではなくundefined
@@ -723,8 +918,8 @@ const OrderEntryPage: React.FC = () => {
         </Card>
       )}
 
-      {/* ステップ1以降: 商品選択・受注内容 */}
-      {activeStep > 0 && customer && (
+      {/* ステップ 1: 商品選択 */}
+      {activeStep === 1 && customer && (
         <Grid container spacing={3}>
           {/* 商品選択エリア */}
           <Grid item xs={12} md={6}>
@@ -1066,23 +1261,17 @@ const OrderEntryPage: React.FC = () => {
                     </Grid>
                   </Grid>
 
-                  {/* 受注ボタン */}
-                  <Box mt={3} display="flex" gap={2}>
+                  
+                  {/* 商品選択完了ボタン */}
+                  <Box mt={3} textAlign="center">
                     <Button
-                      fullWidth
                       variant="contained"
                       size="large"
-                      onClick={handleCreateOrder}
-                      disabled={loading || !customer || orderItems.length === 0}
-                    >
-                      {loading ? '処理中...' : '受注確定'}
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
+                      onClick={() => setActiveStep(2)}
                       disabled={orderItems.length === 0}
+                      sx={{ minWidth: 200 }}
                     >
-                      発注データ出力
+                      金額確認へ進む
                     </Button>
                   </Box>
                 </Box>
@@ -1091,6 +1280,393 @@ const OrderEntryPage: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+      )}
+
+      {/* ステップ 2: 金額確認 */}
+      {activeStep === 2 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              金額確認
+            </Typography>
+            
+            {/* 注文商品一覧 */}
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                注文商品
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>商品名</TableCell>
+                    <TableCell align="center">数量</TableCell>
+                    <TableCell align="right">単価</TableCell>
+                    <TableCell align="right">小計</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orderItems.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {item.product?.name}
+                        </Typography>
+                        {item.notes && (
+                          <Typography variant="caption" color="text.secondary">
+                            {item.notes}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="center">{item.quantity}</TableCell>
+                      <TableCell align="right">¥{item.unitPrice.toLocaleString()}</TableCell>
+                      <TableCell align="right">¥{item.totalPrice.toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+
+            {/* 値引き情報 */}
+            <Box sx={{ mb: 3 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="subtitle1">
+                  値引き
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setShowDiscountDialog(true)}
+                  disabled={orderItems.length === 0}
+                >
+                  値引き追加
+                </Button>
+              </Box>
+              
+              {appliedDiscounts.length > 0 ? (
+                <Box>
+                  {appliedDiscounts.map((discount) => (
+                    <Card key={discount.id} variant="outlined" sx={{ mb: 1 }}>
+                      <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Box flex={1}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Typography variant="body2" fontWeight="medium">
+                                {discount.discountName}
+                              </Typography>
+                              {!discount.approvedBy && (
+                                <Chip 
+                                  label="承認待ち" 
+                                  size="small" 
+                                  color="warning" 
+                                />
+                              )}
+                            </Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {discount.discountType === 'percentage' 
+                                ? `${discount.discountValue}%引き`
+                                : `${discount.discountValue.toLocaleString()}円引き`
+                              }
+                            </Typography>
+                          </Box>
+                          
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="body2" color="error" fontWeight="bold">
+                              -¥{discount.discountAmount.toLocaleString()}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => removeDiscount(discount.id)}
+                            >
+                              <CancelIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                  値引きは適用されていません
+                </Typography>
+              )}
+            </Box>
+
+            {/* 金額合計 */}
+            <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+              <Box display="flex" justifyContent="space-between" mb={1}>
+                <Typography variant="body1">小計</Typography>
+                <Typography variant="body1">
+                  ¥{calculateTotals().subtotal.toLocaleString()}
+                </Typography>
+              </Box>
+              
+              {calculateTotals().totalDiscountAmount > 0 && (
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                  <Typography variant="body1" color="error">値引き合計</Typography>
+                  <Typography variant="body1" color="error">
+                    -¥{calculateTotals().totalDiscountAmount.toLocaleString()}
+                  </Typography>
+                </Box>
+              )}
+              
+              <Divider sx={{ my: 1 }} />
+              
+              <Box display="flex" justifyContent="space-between">
+                <Typography variant="h6" fontWeight="bold">合計金額</Typography>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  ¥{calculateTotals().finalAmount.toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* 店長承認が必要な場合の警告 */}
+            {requiresManagerApproval && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  店長承認が必要な値引きが含まれています。受注確定前に店長の承認を取得してください。
+                </Typography>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ステップ 3: 入金・完了 */}
+      {activeStep === 3 && (
+        <Grid container spacing={3}>
+          {/* 受注内容確認エリア */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  受注内容確認
+                </Typography>
+
+                {/* 選択商品一覧 */}
+                {orderItems.length > 0 ? (
+                  <Table size="small" sx={{ mb: 3 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>商品名</TableCell>
+                        <TableCell align="center">数量</TableCell>
+                        <TableCell align="right">単価</TableCell>
+                        <TableCell align="right">小計</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {orderItems.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {item.product?.name}
+                            </Typography>
+                            {item.notes && (
+                              <Typography variant="caption" color="text.secondary">
+                                {item.notes}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="center">{item.quantity}</TableCell>
+                          <TableCell align="right">¥{item.unitPrice.toLocaleString()}</TableCell>
+                          <TableCell align="right">¥{item.totalPrice.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Alert severity="info">
+                    商品が選択されていません
+                  </Alert>
+                )}
+
+                {/* 値引き表示 */}
+                {appliedDiscounts.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      適用値引き
+                    </Typography>
+                    {appliedDiscounts.map((discount) => (
+                      <Box key={discount.id} display="flex" justifyContent="space-between" sx={{ mb: 1 }}>
+                        <Typography variant="body2">{discount.discountName}</Typography>
+                        <Typography variant="body2" color="error">
+                          -¥{discount.discountAmount.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+
+                {/* 金額計算 */}
+                {orderItems.length > 0 && (
+                  <Box>
+                    <Divider sx={{ mb: 2 }} />
+                    <Box display="flex" justifyContent="space-between" mb={1}>
+                      <Typography variant="body1">小計</Typography>
+                      <Typography variant="body1">
+                        ¥{calculateTotals().subtotal.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    
+                    {calculateTotals().totalDiscountAmount > 0 && (
+                      <Box display="flex" justifyContent="space-between" mb={1}>
+                        <Typography variant="body1" color="error">値引き合計</Typography>
+                        <Typography variant="body1" color="error">
+                          -¥{calculateTotals().totalDiscountAmount.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    )}
+                    
+                    <Box display="flex" justifyContent="space-between" sx={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
+                      <Typography variant="h6">合計金額</Typography>
+                      <Typography variant="h6" color="primary">
+                        ¥{calculateTotals().finalAmount.toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* 入金情報エリア */}
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  入金・完了処理
+                </Typography>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="納期"
+                      type="date"
+                      value={deliveryDate}
+                      onChange={(e) => setDeliveryDate(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>支払方法</InputLabel>
+                      <Select
+                        value={paymentMethod}
+                        label="支払方法"
+                        onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                      >
+                        <MenuItem value="cash">現金</MenuItem>
+                        <MenuItem value="credit">クレジットカード</MenuItem>
+                        <MenuItem value="electronic">電子マネー</MenuItem>
+                        <MenuItem value="receivable">売掛</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={isPartialPayment}
+                          onChange={(e) => {
+                            setIsPartialPayment(e.target.checked);
+                            if (!e.target.checked) {
+                              const finalAmount = calculateTotals().finalAmount;
+                              setPaidAmount(finalAmount);
+                            }
+                          }}
+                        />
+                      }
+                      label="一部入金"
+                    />
+                  </Grid>
+                  {isPartialPayment && (
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="入金額"
+                        type="number"
+                        value={paidAmount}
+                        onChange={(e) => setPaidAmount(Number(e.target.value))}
+                        InputProps={{
+                          startAdornment: <Typography>¥</Typography>,
+                        }}
+                      />
+                    </Grid>
+                  )}
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="備考"
+                      multiline
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </Grid>
+                </Grid>
+
+                {/* 受注ボタン */}
+                <Box mt={3} display="flex" gap={2}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    onClick={handleCreateOrder}
+                    disabled={loading || !customer || orderItems.length === 0}
+                  >
+                    {loading ? '処理中...' : '受注確定'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<DownloadIcon />}
+                    disabled={orderItems.length === 0}
+                  >
+                    発注データ出力
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* ナビゲーションボタン */}
+      {customer && (
+        <Box display="flex" justifyContent="space-between" sx={{ mb: 3 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setActiveStep(prev => Math.max(0, prev - 1))}
+            disabled={activeStep === 0}
+          >
+            戻る
+          </Button>
+          
+          <Box display="flex" gap={1}>
+            {activeStep < 2 && (
+              <Button
+                variant="contained"
+                onClick={() => setActiveStep(prev => prev + 1)}
+                disabled={
+                  (activeStep === 0 && !customer) ||
+                  (activeStep === 1 && orderItems.length === 0)
+                }
+              >
+                次へ
+              </Button>
+            )}
+            
+            {activeStep === 2 && (
+              <Button
+                variant="contained"
+                onClick={() => setActiveStep(3)}
+                disabled={orderItems.length === 0 || requiresManagerApproval}
+              >
+                入金・完了へ
+              </Button>
+            )}
+          </Box>
+        </Box>
       )}
 
       {/* 処方箋表示ダイアログ */}
@@ -1417,6 +1993,109 @@ const OrderEntryPage: React.FC = () => {
             disabled={loading}
           >
             {loading ? '保存中...' : '処方箋保存'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 値引き選択ダイアログ */}
+      <Dialog
+        open={showDiscountDialog}
+        onClose={() => setShowDiscountDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>値引き選択</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            適用可能な値引きを選択してください
+          </Typography>
+          
+          <Box sx={{ mt: 2 }}>
+            {availableDiscounts.map((discount) => {
+              const orderSubtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
+              const calculatedAmount = calculateDiscount(discount, orderSubtotal);
+              const isApplicable = calculatedAmount > 0;
+              
+              return (
+                <Card 
+                  key={discount.id} 
+                  sx={{ 
+                    mb: 2, 
+                    cursor: isApplicable ? 'pointer' : 'not-allowed',
+                    opacity: isApplicable ? 1 : 0.6,
+                    '&:hover': {
+                      bgcolor: isApplicable ? 'action.hover' : 'inherit'
+                    }
+                  }}
+                  onClick={() => isApplicable && applyDiscount(discount)}
+                >
+                  <CardContent>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box flex={1}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="h6" fontWeight="bold">
+                            {discount.name}
+                          </Typography>
+                          {discount.requiresManagerApproval && (
+                            <Chip 
+                              label="店長承認必要" 
+                              size="small" 
+                              color="warning" 
+                            />
+                          )}
+                        </Box>
+                        
+                        <Typography color="text.secondary" gutterBottom>
+                          {discount.description}
+                        </Typography>
+                        
+                        <Box display="flex" gap={2} alignItems="center">
+                          <Typography variant="body2">
+                            {discount.type === 'percentage' 
+                              ? `${discount.value}%引き`
+                              : `${discount.value.toLocaleString()}円引き`
+                            }
+                          </Typography>
+                          
+                          {discount.minOrderAmount > 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              最低注文額: {discount.minOrderAmount.toLocaleString()}円
+                            </Typography>
+                          )}
+                          
+                          {discount.maxDiscountAmount && (
+                            <Typography variant="body2" color="text.secondary">
+                              上限: {discount.maxDiscountAmount.toLocaleString()}円
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                      
+                      <Box textAlign="right">
+                        <Typography 
+                          variant="h6" 
+                          color={isApplicable ? "primary" : "text.disabled"}
+                          fontWeight="bold"
+                        >
+                          -{calculatedAmount.toLocaleString()}円
+                        </Typography>
+                        
+                        {!isApplicable && discount.minOrderAmount > orderSubtotal && (
+                          <Typography variant="caption" color="error">
+                            {discount.minOrderAmount.toLocaleString()}円以上必要
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDiscountDialog(false)}>
+            キャンセル
           </Button>
         </DialogActions>
       </Dialog>

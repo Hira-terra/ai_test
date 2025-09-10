@@ -23,6 +23,8 @@ import {
   Store as StoreIcon,
   LocalShipping as ReceivingIcon,
   QrCode as QrCodeIcon,
+  Business as BusinessIcon,
+  Build as ProductionIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
 import { NavigationItem } from '@/types';
@@ -72,6 +74,18 @@ const navigationItems: NavigationItem[] = [
     icon: ReceivingIcon,
   },
   {
+    path: '/receiving/history',
+    label: '入庫済み一覧',
+    icon: ReceivingIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
+    path: '/production',
+    label: '製作進捗管理',
+    icon: ProductionIcon,
+    requiredPermissions: ['staff', 'manager', 'admin'],
+  },
+  {
     path: '/inventory',
     label: '在庫管理',
     icon: InventoryIcon,
@@ -93,6 +107,12 @@ const navigationItems: NavigationItem[] = [
     path: '/stores',
     label: '店舗マスタ管理',
     icon: StoreIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
+    path: '/suppliers',
+    label: '仕入先マスタ管理',
+    icon: BusinessIcon,
     requiredPermissions: ['manager', 'admin'],
   },
   {

@@ -531,11 +531,13 @@ export class OrderRepository {
     status?: OrderStatus;
     fromDate?: string;
     toDate?: string;
+    orderNumber?: string;
+    customerName?: string;
     page?: number;
     limit?: number;
     storeId?: string;
   }): Promise<{ orders: Order[]; total: number }> {
-    const { customerId, status, fromDate, toDate, page = 1, limit = 50, storeId } = params;
+    const { customerId, status, fromDate, toDate, orderNumber, customerName, page = 1, limit = 50, storeId } = params;
     const offset = (page - 1) * limit;
 
     let whereClause = '1=1';
@@ -572,6 +574,18 @@ export class OrderRepository {
       paramIndex++;
     }
 
+    if (orderNumber) {
+      whereClause += ` AND o.order_number ILIKE $${paramIndex}`;
+      queryParams.push(`%${orderNumber}%`);
+      paramIndex++;
+    }
+
+    if (customerName) {
+      whereClause += ` AND (CONCAT(c.last_name, ' ', c.first_name) ILIKE $${paramIndex} OR CONCAT(c.last_name, c.first_name) ILIKE $${paramIndex + 1})`;
+      queryParams.push(`%${customerName}%`, `%${customerName}%`);
+      paramIndex += 2;
+    }
+
     const query = `
       SELECT 
         o.*,
@@ -596,6 +610,7 @@ export class OrderRepository {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM orders o
+      LEFT JOIN customers c ON o.customer_id = c.id
       WHERE ${whereClause}
     `;
 

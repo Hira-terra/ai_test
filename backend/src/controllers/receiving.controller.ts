@@ -129,6 +129,44 @@ export const receivingController = {
   },
 
   /**
+   * 入庫済み発注一覧取得（買掛一覧用）
+   */
+  async getReceivedOrders(req: AuthRequest, res: Response, next: NextFunction) {
+    const operationId = `ctrl_received_orders_${Date.now()}`;
+    
+    try {
+      const { storeId, supplierId, status, fromDate, toDate } = req.query;
+      const userStoreId = req.user?.storeId;
+      
+      // 権限チェック: adminでない場合は自店舗のみ
+      const targetStoreId = req.user?.role === 'admin' && storeId 
+        ? storeId as string 
+        : userStoreId;
+      
+      logger.info(`[${operationId}] 入庫済み発注一覧取得`, { 
+        userId: req.user?.userId,
+        filters: { storeId: targetStoreId, supplierId, status, fromDate, toDate }
+      });
+      
+      const receivedOrders = await ReceivingService.getReceivedPurchaseOrders({
+        storeId: targetStoreId,
+        supplierId: supplierId as string,
+        status: status as any,
+        fromDate: fromDate as string,
+        toDate: toDate as string
+      });
+      
+      res.json({
+        success: true,
+        data: receivedOrders
+      });
+    } catch (error) {
+      logger.error(`[${operationId}] 入庫済み発注一覧取得エラー`, error);
+      next(error);
+    }
+  },
+
+  /**
    * 入庫詳細取得
    */
   async getReceivingDetail(req: AuthRequest, res: Response, next: NextFunction) {

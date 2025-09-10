@@ -169,6 +169,34 @@ export class ReceivingService {
   }
 
   /**
+   * 入庫済み発注一覧を取得（買掛一覧用）
+   */
+  static async getReceivedPurchaseOrders(params?: {
+    storeId?: string;
+    supplierId?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    const operationId = `service_received_orders_${Date.now()}`;
+    
+    try {
+      logger.info(`[${operationId}] 入庫済み発注一覧取得開始`, { params });
+      
+      const receivedOrders = await ReceivingModel.getReceivedPurchaseOrders(params);
+      
+      logger.info(`[${operationId}] 入庫済み発注一覧取得完了`, { 
+        count: receivedOrders.length 
+      });
+      
+      return receivedOrders;
+    } catch (error: any) {
+      logger.error(`[${operationId}] 入庫済み発注一覧取得エラー`, error);
+      throw error;
+    }
+  }
+
+  /**
    * 入庫ステータス更新
    */
   static async updateReceivingStatus(

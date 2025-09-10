@@ -1,4 +1,6 @@
 import { FrameModel, Frame, CreateFrameData, UpdateFrameData, FrameStatus } from '../models/frame.model';
+import { frameStatusHistoryModel } from '../models/frameStatusHistory.model';
+import { db } from '../config/database';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -72,21 +74,46 @@ export class FrameService {
    * 個体番号の重複チェック
    */
   private async validateSerialNumbers(serialNumbers: string[]): Promise<void> {
+    const operationId = uuidv4();
+    logger.info('[FRAME_SERVICE] 個体番号検証開始', { 
+      operationId, 
+      count: serialNumbers.length,
+      serialNumbers: serialNumbers.slice(0, 5) // 最初の5個のみログ出力
+    });
+
     // 配列内での重複チェック
     const duplicatesInArray = serialNumbers.filter((serial, index) => 
       serialNumbers.indexOf(serial) !== index
     );
     
     if (duplicatesInArray.length > 0) {
+      logger.error('[FRAME_SERVICE] 配列内重複検出', { operationId, duplicatesInArray });
       throw new Error(`個体番号が重複しています: ${duplicatesInArray.join(', ')}`);
     }
 
-    // データベース内での重複チェック
-    for (const serialNumber of serialNumbers) {
-      const existingFrame = await FrameModel.findBySerialNumber(serialNumber);
-      if (existingFrame) {
-        throw new Error(`個体番号「${serialNumber}」は既に存在します`);
+    // データベース内での重複チェック（一括検索で効率化）
+    const existingFramesQuery = `
+      SELECT serial_number 
+      FROM frames 
+      WHERE serial_number = ANY($1::text[])
+    `;
+    
+    try {
+      const result = await db.query(existingFramesQuery, [serialNumbers]);
+      
+      if (result.rows.length > 0) {
+        const existingSerials = result.rows.map((row: any) => row.serial_number);
+        logger.error('[FRAME_SERVICE] データベース内重複検出', { 
+          operationId, 
+          existingSerials 
+        });
+        throw new Error(`個体番号「${existingSerials.join(', ')}」は既に存在します`);
       }
+      
+      logger.info('[FRAME_SERVICE] 個体番号検証完了', { operationId });
+    } catch (error) {
+      logger.error('[FRAME_SERVICE] 個体番号検証エラー', { error, operationId });
+      throw error;
     }
   }
 
@@ -169,6 +196,70 @@ export class FrameService {
 
     } catch (error) {
       logger.error('[FRAME_SERVICE] フレーム個体更新エラー', { error, operationId, id });
+      throw error;
+    }
+  }
+
+  /**
+   * フレーム個体のステータス更新（履歴記録付き）
+   */
+  async updateFrameStatus(
+    id: string,
+    newStatus: FrameStatus,
+    changedBy: string,
+    orderId?: string,
+    changeReason?: string,
+    notes?: string
+  ): Promise<Frame | null> {
+    const operationId = uuidv4();
+    logger.info('[FRAME_SERVICE] ステータス更新開始', { 
+      operationId, 
+      id, 
+      newStatus, 
+      changedBy 
+    });
+
+    try {
+      const frame = await FrameModel.updateStatus(
+        id,
+        newStatus,
+        changedBy,
+        orderId,
+        changeReason,
+        notes
+      );
+
+      if (!frame) {
+        throw new Error(`フレーム個体が見つかりません: ${id}`);
+      }
+
+      logger.info('[FRAME_SERVICE] ステータス更新完了', { operationId, id, newStatus });
+      return frame;
+
+    } catch (error) {
+      logger.error('[FRAME_SERVICE] ステータス更新エラー', { error, operationId, id });
+      throw error;
+    }
+  }
+
+  /**
+   * フレーム個体のステータス履歴取得
+   */
+  async getFrameStatusHistory(frameId: string) {
+    const operationId = uuidv4();
+    logger.info('[FRAME_SERVICE] ステータス履歴取得開始', { operationId, frameId });
+
+    try {
+      const history = await frameStatusHistoryModel.getFrameStatusHistory(frameId);
+      logger.info('[FRAME_SERVICE] ステータス履歴取得完了', { 
+        operationId, 
+        frameId, 
+        historyCount: history.length 
+      });
+      return history;
+
+    } catch (error) {
+      logger.error('[FRAME_SERVICE] ステータス履歴取得エラー', { error, operationId, frameId });
       throw error;
     }
   }

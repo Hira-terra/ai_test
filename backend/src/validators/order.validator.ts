@@ -275,6 +275,22 @@ export const orderSearchSchema = Joi.object({
       'date.min': '終了日は開始日以降で設定してください。'
     }),
   
+  // 受注番号検索パラメータを追加
+  orderNumber: Joi.string()
+    .max(100)
+    .optional()
+    .messages({
+      'string.max': '受注番号は100文字以下で入力してください。'
+    }),
+  
+  // 顧客名検索パラメータを追加
+  customerName: Joi.string()
+    .max(100)
+    .optional()
+    .messages({
+      'string.max': '顧客名は100文字以下で入力してください。'
+    }),
+  
   page: Joi.number()
     .integer()
     .min(1)

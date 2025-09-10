@@ -42,43 +42,25 @@ const LoginPage: React.FC = () => {
   const [stores, setStores] = useState<Store[]>([]);
   const [loadingStores, setLoadingStores] = useState(true);
 
-  // デバッグ用: storesステートの変化を監視
-  useEffect(() => {
-    console.log('🏪 Stores state changed:', stores, 'Loading:', loadingStores);
-  }, [stores, loadingStores]);
-
   useEffect(() => {
     if (isAuthenticated) {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
 
-  // @MOCK_TO_API: 店舗一覧取得
+  // 店舗一覧取得
   useEffect(() => {
     const loadStores = async () => {
-      console.log('🔍 Loading stores...');
-      
-      // 直接fetchテスト
-      try {
-        console.log('🧪 Direct fetch test...');
-        const directResponse = await fetch('http://localhost:3001/api/stores');
-        console.log('🌐 Direct fetch status:', directResponse.status);
-        const directData = await directResponse.json();
-        console.log('📦 Direct fetch data:', directData);
-      } catch (error) {
-        console.error('❌ Direct fetch failed:', error);
-      }
-      
-      // storeServiceテスト
+      console.log('🏪 店舗一覧の取得を開始');
       try {
         const stores = await storeService.getAllStores();
-        console.log('✅ Stores loaded successfully:', stores);
+        console.log('✅ 店舗一覧取得成功:', stores);
         setStores(stores);
       } catch (error) {
         console.error('❌ 店舗一覧の取得に失敗しました:', error);
       } finally {
+        console.log('🏁 店舗一覧取得処理終了');
         setLoadingStores(false);
-        console.log('🏁 Store loading finished');
       }
     };
 
@@ -120,7 +102,7 @@ const LoginPage: React.FC = () => {
     setShowPassword(!showPassword);
   };
 
-  // @MOCK_UI: テスト用認証情報入力機能
+  // テスト用認証情報入力機能
   const fillTestCredentials = (userType: 'staff' | 'manager' | 'admin') => {
     const testCredentials: Record<string, LoginRequest> = {
       staff: {
@@ -141,8 +123,9 @@ const LoginPage: React.FC = () => {
     };
 
     setFormData(testCredentials[userType]);
-    setError(null); // エラーメッセージをクリア
+    setError(null);
   };
+
 
   if (isLoading) {
     return (
@@ -180,7 +163,7 @@ const LoginPage: React.FC = () => {
               </Typography>
             </Box>
 
-            {/* @MOCK_UI: テスト用認証情報入力ボタン */}
+            {/* テスト用認証情報入力ボタン */}
             {process.env.NODE_ENV === 'development' && (
               <Alert severity="info" sx={{ mb: 3 }}>
                 <Typography variant="body2" gutterBottom>
@@ -245,14 +228,11 @@ const LoginPage: React.FC = () => {
                     ) : stores.length === 0 ? (
                       <MenuItem disabled>店舗データがありません</MenuItem>
                     ) : (
-                      stores.map((store) => {
-                        console.log('🏪 Rendering store item:', store);
-                        return (
-                          <MenuItem key={store.id} value={store.storeCode}>
-                            {store.storeCode} - {store.name}
-                          </MenuItem>
-                        );
-                      })
+                      stores.map((store) => (
+                        <MenuItem key={store.id} value={store.storeCode}>
+                          {store.storeCode} - {store.name}
+                        </MenuItem>
+                      ))
                     )}
                   </Select>
                 </FormControl>

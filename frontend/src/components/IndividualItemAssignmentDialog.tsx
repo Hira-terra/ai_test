@@ -35,6 +35,7 @@ import {
   Cancel as CancelIcon
 } from '@mui/icons-material';
 import { PurchaseOrderItem, Frame } from '../types';
+import QRCodeScanner from './QRCodeScanner';
 
 interface IndividualItem {
   id: string;
@@ -72,6 +73,8 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
   const [items, setItems] = useState<IndividualItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scannerDialog, setScannerDialog] = useState(false);
+  const [currentScanItemId, setCurrentScanItemId] = useState<string | null>(null);
 
   // ダイアログが開かれた時に初期データを設定
   useEffect(() => {
@@ -137,8 +140,22 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
   };
 
   const handleScanQR = (tempId: string) => {
-    // QRコードスキャン機能（将来実装）
-    alert('QRコードスキャン機能は今後実装予定です');
+    setCurrentScanItemId(tempId);
+    setScannerDialog(true);
+  };
+
+  const handleScanComplete = (data: any) => {
+    if (currentScanItemId && data.serialNumber) {
+      handleItemChange(currentScanItemId, 'serialNumber', data.serialNumber);
+      if (data.color) {
+        handleItemChange(currentScanItemId, 'color', data.color);
+      }
+      if (data.size) {
+        handleItemChange(currentScanItemId, 'size', data.size);
+      }
+    }
+    setScannerDialog(false);
+    setCurrentScanItemId(null);
   };
 
   const validateItems = (): boolean => {
@@ -167,6 +184,12 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
 
   const handleSave = async () => {
     if (!validateItems()) return;
+    
+    // 二重クリック防止：既に処理中の場合は処理を終了
+    if (loading) {
+      console.warn('個体登録処理が既に実行中です');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -366,6 +389,17 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
           {loading ? '登録中...' : `${items.length}個の個体を登録`}
         </Button>
       </DialogActions>
+
+      {/* QRコードスキャンダイアログ */}
+      <QRCodeScanner
+        open={scannerDialog}
+        onClose={() => {
+          setScannerDialog(false);
+          setCurrentScanItemId(null);
+        }}
+        onScan={handleScanComplete}
+        title="個体番号スキャン"
+      />
     </Dialog>
   );
 };

@@ -35,6 +35,8 @@ export class OrderService {
     status?: OrderStatus;
     fromDate?: string;
     toDate?: string;
+    orderNumber?: string;
+    customerName?: string;
     page?: number;
     limit?: number;
     storeId?: string;

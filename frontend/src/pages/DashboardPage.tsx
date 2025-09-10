@@ -178,7 +178,6 @@ const DashboardPage: React.FC = () => {
 
   return (
     <Box>
-      {/* @MOCK_UI: モック使用時のバナー表示 */}
       
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>

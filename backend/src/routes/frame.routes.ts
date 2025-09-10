@@ -48,6 +48,18 @@ router.get('/inventory-summary', frameController.getInventorySummary.bind(frameC
 router.get('/:id', frameController.getFrameById.bind(frameController));
 
 /**
+ * フレーム個体のステータス履歴取得
+ * GET /api/frames/:id/history
+ */
+router.get('/:id/history', frameController.getFrameStatusHistory.bind(frameController));
+
+/**
+ * フレーム個体のステータス更新
+ * PUT /api/frames/:id/status
+ */
+router.put('/:id/status', frameController.updateFrameStatus.bind(frameController));
+
+/**
  * フレーム個体更新
  * PUT /api/frames/:id
  */

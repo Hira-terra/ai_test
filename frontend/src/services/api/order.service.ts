@@ -87,6 +87,8 @@ export const apiOrderService = {
     customerId?: string;
     status?: OrderStatus;
     search?: string;
+    orderNumber?: string;
+    customerName?: string;
     fromDate?: string;
     toDate?: string;
     page?: number;
@@ -98,7 +100,17 @@ export const apiOrderService = {
       const queryParams = new URLSearchParams();
       if (params?.customerId) queryParams.append('customerId', params.customerId);
       if (params?.status) queryParams.append('status', params.status);
-      if (params?.search) queryParams.append('search', params.search);
+      
+      // searchパラメータがある場合は、orderNumberとcustomerNameの両方として送信
+      if (params?.search) {
+        queryParams.append('orderNumber', params.search);
+        queryParams.append('customerName', params.search);
+      }
+      
+      // 個別のorderNumberとcustomerNameパラメータも対応
+      if (params?.orderNumber) queryParams.append('orderNumber', params.orderNumber);
+      if (params?.customerName) queryParams.append('customerName', params.customerName);
+      
       if (params?.fromDate) queryParams.append('fromDate', params.fromDate);
       if (params?.toDate) queryParams.append('toDate', params.toDate);
       if (params?.page) queryParams.append('page', params.page.toString());

@@ -2,6 +2,7 @@ import { Pool, PoolClient } from 'pg';
 import { db } from '../config/database';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
+import { frameStatusHistoryModel } from './frameStatusHistory.model';
 
 export type FrameStatus = 'in_stock' | 'reserved' | 'sold' | 'damaged' | 'transferred';
 
@@ -301,6 +302,73 @@ export class FrameModel {
     } catch (error) {
       logger.error(`[FRAME_MODEL] フレーム個体更新エラー: ${id}`, { error, operationId });
       throw error;
+    }
+  }
+
+  /**
+   * ステータスを更新（履歴記録付き）
+   */
+  static async updateStatus(
+    id: string,
+    newStatus: FrameStatus,
+    changedBy: string,
+    orderId?: string,
+    changeReason?: string,
+    notes?: string
+  ): Promise<Frame | null> {
+    const operationId = uuidv4();
+    logger.info(`[FRAME_MODEL] ステータス更新開始: ${id} -> ${newStatus}`, { operationId });
+
+    const client = await db.getPool().connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // 現在のフレーム情報を取得
+      const currentFrameQuery = `SELECT * FROM frames WHERE id = $1`;
+      const currentFrameResult = await client.query(currentFrameQuery, [id]);
+      
+      if (currentFrameResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const currentFrame = currentFrameResult.rows[0];
+      const oldStatus = currentFrame.status;
+
+      // ステータス更新
+      const updateQuery = `
+        UPDATE frames 
+        SET status = $1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+        RETURNING *
+      `;
+      const updateResult = await client.query(updateQuery, [newStatus, id]);
+
+      // ステータス履歴を記録
+      await frameStatusHistoryModel.recordStatusChange(
+        id,
+        oldStatus,
+        newStatus,
+        changedBy,
+        orderId,
+        changeReason,
+        notes,
+        client
+      );
+
+      await client.query('COMMIT');
+
+      const updatedFrame = this.transformRow(updateResult.rows[0]);
+      logger.info(`[FRAME_MODEL] ステータス更新完了: ${id} (${oldStatus} -> ${newStatus})`, { operationId });
+      
+      return updatedFrame;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error(`[FRAME_MODEL] ステータス更新エラー: ${id}`, { error, operationId });
+      throw error;
+    } finally {
+      client.release();
     }
   }
 

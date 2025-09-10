@@ -119,6 +119,29 @@ class ReceivingAPIService {
   }
 
   /**
+   * 入庫済み発注一覧を取得（買掛一覧用）
+   */
+  async getReceivedOrdersHistory(params?: {
+    storeId?: string;
+    supplierId?: string;
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<ApiResponse<PurchaseOrder[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.storeId) queryParams.append('storeId', params.storeId);
+    if (params?.supplierId) queryParams.append('supplierId', params.supplierId);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.fromDate) queryParams.append('fromDate', params.fromDate);
+    if (params?.toDate) queryParams.append('toDate', params.toDate);
+    
+    const queryString = queryParams.toString();
+    const url = `/receiving/received-orders${queryString ? `?${queryString}` : ''}`;
+    
+    return apiClient.get<PurchaseOrder[]>(url);
+  }
+
+  /**
    * 入庫ステータスを更新
    */
   async updateReceivingStatus(
