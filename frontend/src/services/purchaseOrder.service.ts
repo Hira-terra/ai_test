@@ -1,4 +1,4 @@
-import { ApiResponse, Order, PurchaseOrder, Supplier, PurchaseOrderStatus } from '../types';
+import { ApiResponse, Order, PurchaseOrder, Supplier, PurchaseOrderStatus, CreateStockPurchaseOrderItem, StockLevel, StockLevelAlert } from '../types';
 import { authService } from './auth.service';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -283,6 +283,153 @@ class PurchaseOrderService {
       return await response.json();
     } catch (error) {
       console.error('発注統計取得エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫発注を作成
+   */
+  async createStockReplenishment(data: {
+    supplierId: string;
+    expectedDeliveryDate?: string;
+    notes?: string;
+    stockItems: CreateStockPurchaseOrderItem[];
+  }): Promise<ApiResponse<PurchaseOrder>> {
+    try {
+      const response = await fetch(`${API_BASE}/api/purchase-orders/stock-replenishment`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('在庫発注作成エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫レベル一覧を取得
+   */
+  async getStockLevels(params?: {
+    storeId?: string;
+    productId?: string;
+    lowStockOnly?: boolean;
+    autoOrderEnabled?: boolean;
+    productCategory?: string;
+    limit?: number;
+    offset?: number;
+    sort?: string;
+  }): Promise<ApiResponse<{ stockLevels: StockLevel[]; total: number }>> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.storeId) queryParams.append('storeId', params.storeId);
+      if (params?.productId) queryParams.append('productId', params.productId);
+      if (params?.lowStockOnly) queryParams.append('lowStockOnly', 'true');
+      if (params?.autoOrderEnabled !== undefined) queryParams.append('autoOrderEnabled', params.autoOrderEnabled.toString());
+      if (params?.productCategory) queryParams.append('productCategory', params.productCategory);
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.offset) queryParams.append('offset', params.offset.toString());
+      if (params?.sort) queryParams.append('sort', params.sort);
+
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders/stock-levels?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('在庫レベル一覧取得エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫アラート一覧を取得
+   */
+  async getStockAlerts(params?: {
+    storeId?: string;
+    alertType?: 'low_stock' | 'out_of_stock' | 'overstocked';
+    isResolved?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ alerts: StockLevelAlert[]; total: number }>> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.storeId) queryParams.append('storeId', params.storeId);
+      if (params?.alertType) queryParams.append('alertType', params.alertType);
+      if (params?.isResolved !== undefined) queryParams.append('isResolved', params.isResolved.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.offset) queryParams.append('offset', params.offset.toString());
+
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders/stock-alerts?${queryParams.toString()}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('在庫アラート一覧取得エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 自動発注提案を取得
+   */
+  async getSuggestedOrders(storeId: string): Promise<ApiResponse<Array<{
+    productId: string;
+    product: {
+      id: string;
+      productCode: string;
+      name: string;
+      brand: string;
+      category: string;
+      costPrice: number;
+    };
+    currentQuantity: number;
+    safetyStock: number;
+    maxStock: number;
+    suggestedQuantity: number;
+    suggestedCost: number;
+  }>>> {
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders/suggested-orders?storeId=${storeId}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders()
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('自動発注提案取得エラー:', error);
       throw error;
     }
   }

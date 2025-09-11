@@ -397,6 +397,166 @@ export const getStatistics = async (req: AuthenticatedRequest, res: Response) =>
   }
 };
 
+/**
+ * 在庫レベル一覧取得
+ */
+export const getStockLevels = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      storeId,
+      productId,
+      lowStockOnly,
+      autoOrderEnabled,
+      productCategory,
+      limit,
+      offset,
+      sort
+    } = req.query;
+
+    const result = await purchaseOrderService.getStockLevels({
+      storeId: storeId as string,
+      productId: productId as string,
+      lowStockOnly: lowStockOnly === 'true',
+      autoOrderEnabled: autoOrderEnabled === 'true',
+      productCategory: productCategory as string,
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined,
+      sort: sort as string
+    });
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    logger.error('[PurchaseOrderController] 在庫レベル一覧取得エラー', { error });
+    
+    return res.status(500).json({
+      success: false,
+      error: '在庫レベル一覧の取得に失敗しました'
+    });
+  }
+};
+
+/**
+ * 在庫アラート一覧取得
+ */
+export const getStockAlerts = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      storeId,
+      alertType,
+      isResolved,
+      limit,
+      offset
+    } = req.query;
+
+    const result = await purchaseOrderService.getStockAlerts({
+      storeId: storeId as string,
+      alertType: alertType as 'low_stock' | 'out_of_stock' | 'overstocked',
+      isResolved: isResolved === 'true',
+      limit: limit ? parseInt(limit as string) : undefined,
+      offset: offset ? parseInt(offset as string) : undefined
+    });
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    logger.error('[PurchaseOrderController] 在庫アラート一覧取得エラー', { error });
+    
+    return res.status(500).json({
+      success: false,
+      error: '在庫アラート一覧の取得に失敗しました'
+    });
+  }
+};
+
+/**
+ * 自動発注提案取得
+ */
+export const getSuggestedOrders = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { storeId } = req.query;
+
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: '店舗IDが必要です'
+      });
+    }
+
+    const suggestions = await purchaseOrderService.getSuggestedOrders(storeId as string);
+
+    return res.json({
+      success: true,
+      data: suggestions
+    });
+  } catch (error) {
+    logger.error('[PurchaseOrderController] 自動発注提案取得エラー', { error });
+    
+    return res.status(500).json({
+      success: false,
+      error: '自動発注提案の取得に失敗しました'
+    });
+  }
+};
+
+/**
+ * 在庫発注作成
+ */
+export const createStockReplenishment = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { supplierId, expectedDeliveryDate, notes, stockItems } = req.body;
+    const userId = req.user?.userId;
+    const storeId = req.user?.storeId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: '認証が必要です'
+      });
+    }
+
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: '店舗IDが必要です'
+      });
+    }
+
+    const purchaseOrder = await purchaseOrderService.createStockReplenishment({
+      supplierId,
+      storeId,
+      expectedDeliveryDate,
+      notes,
+      stockItems,
+      createdBy: userId
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: purchaseOrder
+    });
+  } catch (error) {
+    logger.error('[PurchaseOrderController] 在庫発注作成エラー', { error });
+    
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+        details: error.details
+      });
+    }
+    
+    return res.status(500).json({
+      success: false,
+      error: '在庫発注の作成に失敗しました'
+    });
+  }
+};
+
 export const purchaseOrderController = {
   getAvailableOrders,
   getPurchaseOrders,
@@ -406,5 +566,9 @@ export const purchaseOrderController = {
   updateStatus,
   sendPurchaseOrder,
   getSuppliers,
-  getStatistics
+  getStatistics,
+  getStockLevels,
+  getStockAlerts,
+  getSuggestedOrders,
+  createStockReplenishment
 };

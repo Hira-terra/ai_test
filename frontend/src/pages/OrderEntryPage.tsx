@@ -60,6 +60,7 @@ import {
 import { customerService } from '@/services/customer.service';
 import { productService } from '@/services/product.service';
 import { orderService } from '@/services/order.service';
+import { discountService } from '@/services/discount.service';
 
 const OrderEntryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -119,113 +120,25 @@ const OrderEntryPage: React.FC = () => {
   const [availableDiscounts, setAvailableDiscounts] = useState<Discount[]>([]);
   const [appliedDiscounts, setAppliedDiscounts] = useState<OrderDiscount[]>([]);
   const [showDiscountDialog, setShowDiscountDialog] = useState(false);
+  const [selectedDiscountForApply, setSelectedDiscountForApply] = useState<Discount | null>(null);
+  const [discountApplyComment, setDiscountApplyComment] = useState('');
+  const [managerApprovalConfirmed, setManagerApprovalConfirmed] = useState(false);
+  const [showDiscountCommentDialog, setShowDiscountCommentDialog] = useState(false);
   // 将来的に使用予定
-  // const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(null);
   // const [discountCalculationResults, setDiscountCalculationResults] = useState<DiscountCalculationResult[]>([]);
   const [requiresManagerApproval, setRequiresManagerApproval] = useState(false);
+  const [showManagerApprovalDialog, setShowManagerApprovalDialog] = useState(false);
+  const [managerApprovalStatus, setManagerApprovalStatus] = useState<'pending' | 'approved' | 'denied'>('pending');
+  const [managerApprovalComment, setManagerApprovalComment] = useState('');
 
-  // モック値引きマスタデータ（後でAPIから取得に変更）
-  const mockDiscounts: Discount[] = [
-    {
-      id: 'D001',
-      discountCode: 'PERCENT_5',
-      name: '5%割引',
-      type: 'percentage',
-      value: 5,
-      minOrderAmount: 0,
-      maxDiscountAmount: 5000,
-      applicableTo: 'order',
-      requiresManagerApproval: false,
-      currentUses: 0,
-      isActive: true,
-      displayOrder: 1,
-      validFrom: '2024-01-01T00:00:00Z',
-      validTo: '2024-12-31T23:59:59Z',
-      description: '通常の5%割引',
-      createdBy: 'admin001',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: 'D002',
-      discountCode: 'PERCENT_10',
-      name: '10%割引',
-      type: 'percentage',
-      value: 10,
-      minOrderAmount: 10000,
-      maxDiscountAmount: 10000,
-      applicableTo: 'order',
-      requiresManagerApproval: true,
-      currentUses: 0,
-      isActive: true,
-      displayOrder: 2,
-      validFrom: '2024-01-01T00:00:00Z',
-      validTo: '2024-12-31T23:59:59Z',
-      description: '1万円以上で10%割引（店長承認必要）',
-      createdBy: 'admin001',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: 'D003',
-      discountCode: 'AMOUNT_1000',
-      name: '1,000円引き',
-      type: 'amount',
-      value: 1000,
-      minOrderAmount: 5000,
-      applicableTo: 'order',
-      requiresManagerApproval: false,
-      currentUses: 0,
-      isActive: true,
-      displayOrder: 3,
-      validFrom: '2024-01-01T00:00:00Z',
-      validTo: '2024-12-31T23:59:59Z',
-      description: '5,000円以上で1,000円引き',
-      createdBy: 'admin001',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: 'D004',
-      discountCode: 'SENIOR',
-      name: 'シニア割引（15%）',
-      type: 'percentage',
-      value: 15,
-      minOrderAmount: 0,
-      maxDiscountAmount: 15000,
-      applicableTo: 'order',
-      requiresManagerApproval: false,
-      currentUses: 0,
-      isActive: true,
-      displayOrder: 4,
-      validFrom: '2024-01-01T00:00:00Z',
-      validTo: '2024-12-31T23:59:59Z',
-      description: '65歳以上のお客様限定',
-      createdBy: 'admin001',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    },
-    {
-      id: 'D005',
-      discountCode: 'STAFF',
-      name: 'スタッフ割引（20%）',
-      type: 'percentage',
-      value: 20,
-      minOrderAmount: 0,
-      maxDiscountAmount: 20000,
-      applicableTo: 'order',
-      requiresManagerApproval: true,
-      currentUses: 0,
-      isActive: true,
-      displayOrder: 5,
-      validFrom: '2024-01-01T00:00:00Z',
-      validTo: '2024-12-31T23:59:59Z',
-      description: '店舗スタッフ専用割引（店長承認必要）',
-      createdBy: 'admin001',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z'
-    }
-  ];
+  // 通貨フォーマット関数
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ja-JP', { 
+      style: 'currency', 
+      currency: 'JPY' 
+    }).format(amount);
+  };
+
   
   // 商品カテゴリー定義
   const productCategories = [
@@ -301,8 +214,8 @@ const OrderEntryPage: React.FC = () => {
     return Math.floor(calculatedAmount); // 小数点切り捨て
   };
 
-  // 値引き適用処理
-  const applyDiscount = (discount: Discount) => {
+  // 値引き選択処理（コメント入力ダイアログを開く）
+  const selectDiscountForApply = (discount: Discount) => {
     const orderSubtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
     const discountAmount = calculateDiscount(discount, orderSubtotal);
     
@@ -311,29 +224,56 @@ const OrderEntryPage: React.FC = () => {
       return;
     }
 
+    setSelectedDiscountForApply(discount);
+    setDiscountApplyComment('');
+    setManagerApprovalConfirmed(false);
+    setShowDiscountDialog(false);
+    setShowDiscountCommentDialog(true);
+  };
+
+  // 値引き適用処理（コメント付き）
+  const applyDiscount = () => {
+    if (!selectedDiscountForApply) return;
+    
+    // 店長承認が必要な値引きの場合の検証
+    if (selectedDiscountForApply.requiresManagerApproval) {
+      if (!managerApprovalConfirmed) {
+        setError('店長承認が必要な値引きです。店長に確認してチェックを入れてください。');
+        return;
+      }
+      if (!discountApplyComment.trim()) {
+        setError('店長承認が必要な値引きには、確認コメントの入力が必須です。');
+        return;
+      }
+    }
+    
+    const orderSubtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
+    const discountAmount = calculateDiscount(selectedDiscountForApply, orderSubtotal);
+
     const orderDiscount: OrderDiscount = {
       id: `OD_${Date.now()}`,
       orderId: '', // 受注確定時に設定
-      discountId: discount.id,
-      discount: discount,
-      discountCode: discount.discountCode,
-      discountName: discount.name,
-      discountType: discount.type,
-      discountValue: discount.value,
+      discountId: selectedDiscountForApply.id,
+      discount: selectedDiscountForApply,
+      discountCode: selectedDiscountForApply.discountCode,
+      discountName: selectedDiscountForApply.name,
+      discountType: selectedDiscountForApply.type,
+      discountValue: selectedDiscountForApply.value,
       originalAmount: orderSubtotal,
       discountAmount: discountAmount,
       discountedAmount: orderSubtotal - discountAmount,
-      approvedBy: discount.requiresManagerApproval ? undefined : 'current_user', // ログインユーザーのID
-      approvedAt: discount.requiresManagerApproval ? undefined : new Date().toISOString(),
+      approvedBy: selectedDiscountForApply.requiresManagerApproval && managerApprovalConfirmed ? 'current_user' : 'current_user',
+      approvedAt: new Date().toISOString(),
+      notes: discountApplyComment || undefined, // コメントがある場合のみ設定
       createdAt: new Date().toISOString()
     };
 
     setAppliedDiscounts(prev => [...prev, orderDiscount]);
-    setShowDiscountDialog(false);
-    
-    if (discount.requiresManagerApproval) {
-      setRequiresManagerApproval(true);
-    }
+    setShowDiscountCommentDialog(false);
+    setSelectedDiscountForApply(null);
+    setDiscountApplyComment('');
+    setManagerApprovalConfirmed(false);
+    setError(null);
   };
 
   // 値引き削除処理
@@ -352,12 +292,16 @@ const OrderEntryPage: React.FC = () => {
   const calculateTotals = () => {
     const subtotal = orderItems.reduce((total, item) => total + item.totalPrice, 0);
     const totalDiscountAmount = appliedDiscounts.reduce((total, discount) => total + discount.discountAmount, 0);
-    const finalAmount = subtotal - totalDiscountAmount;
+    const discountedSubtotal = Math.max(0, subtotal - totalDiscountAmount);
+    const taxAmount = Math.floor(discountedSubtotal * 0.1);
+    const finalAmount = discountedSubtotal + taxAmount;
     
     return {
       subtotal,
       totalDiscountAmount,
-      finalAmount: Math.max(0, finalAmount) // 負の値にならないように
+      discountedSubtotal,
+      taxAmount,
+      finalAmount
     };
   };
 
@@ -366,8 +310,14 @@ const OrderEntryPage: React.FC = () => {
     const initializeData = async () => {
       setLoading(true);
       try {
-        // 値引きマスタの初期化
-        setAvailableDiscounts(mockDiscounts);
+        // 値引きマスタの初期化（実APIから取得）
+        const discountResponse = await discountService.getAvailableDiscounts();
+        if (discountResponse.success && discountResponse.data) {
+          setAvailableDiscounts(discountResponse.data);
+        } else {
+          console.warn('値引きマスタの取得に失敗しました:', discountResponse.error);
+          setAvailableDiscounts([]);
+        }
         // @MOCK_TO_API: 顧客情報取得
         if (customerId) {
           const customerResponse = await customerService.getCustomerById(customerId);
@@ -481,10 +431,19 @@ const OrderEntryPage: React.FC = () => {
     return searchMatch;
   });
 
-  // 金額計算
+  // 金額計算（値引き考慮）
   const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const taxAmount = Math.floor(subtotal * 0.1);
-  const totalAmount = subtotal + taxAmount;
+  const totalDiscountAmount = appliedDiscounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
+  const discountedSubtotal = Math.max(0, subtotal - totalDiscountAmount);
+  const taxAmount = Math.floor(discountedSubtotal * 0.1);
+  const totalAmount = discountedSubtotal + taxAmount; // 値引き後の合計金額
+
+  // 部分支払いでない場合は入金額を合計金額（値引き後）に自動更新
+  React.useEffect(() => {
+    if (!isPartialPayment) {
+      setPaidAmount(totalAmount);
+    }
+  }, [totalAmount, isPartialPayment]);
 
   // 顧客検索
   const handleCustomerSearch = async () => {
@@ -694,6 +653,11 @@ const OrderEntryPage: React.FC = () => {
           prescriptionId: item.prescriptionId,
           notes: item.notes
         })),
+        discounts: appliedDiscounts.map(discount => ({
+          discountId: discount.discountId,
+          discountAmount: discount.discountAmount,
+          originalAmount: discount.originalAmount
+        })),
         subtotalAmount: subtotal,
         taxAmount: taxAmount,
         totalAmount: totalAmount,
@@ -801,7 +765,7 @@ const OrderEntryPage: React.FC = () => {
                 value={customerSearchQuery}
                 onChange={(e) => setCustomerSearchQuery(e.target.value)}
                 placeholder="山田太郎 または C-001 または 03-1234-5678"
-                onKeyPress={(e) => {
+                onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleCustomerSearch();
                   }
@@ -1226,9 +1190,7 @@ const OrderEntryPage: React.FC = () => {
                             checked={isPartialPayment}
                             onChange={(e) => {
                               setIsPartialPayment(e.target.checked);
-                              if (!e.target.checked) {
-                                setPaidAmount(totalAmount);
-                              }
+                              // useEffectで自動更新されるため、手動設定は不要
                             }}
                           />
                         }
@@ -1367,6 +1329,11 @@ const OrderEntryPage: React.FC = () => {
                                 : `${discount.discountValue.toLocaleString()}円引き`
                               }
                             </Typography>
+                            {discount.notes && (
+                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block' }}>
+                                理由: {discount.notes}
+                              </Typography>
+                            )}
                           </Box>
                           
                           <Box display="flex" alignItems="center" gap={1}>
@@ -1517,12 +1484,47 @@ const OrderEntryPage: React.FC = () => {
                       </Box>
                     )}
                     
+                    {calculateTotals().totalDiscountAmount > 0 && (
+                      <Box display="flex" justifyContent="space-between" mb={1}>
+                        <Typography variant="body1">値引き後小計</Typography>
+                        <Typography variant="body1">
+                          ¥{calculateTotals().discountedSubtotal.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    )}
+                    
+                    <Box display="flex" justifyContent="space-between" mb={1}>
+                      <Typography variant="body1">消費税 (10%)</Typography>
+                      <Typography variant="body1">
+                        ¥{calculateTotals().taxAmount.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    
                     <Box display="flex" justifyContent="space-between" sx={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                       <Typography variant="h6">合計金額</Typography>
                       <Typography variant="h6" color="primary">
                         ¥{calculateTotals().finalAmount.toLocaleString()}
                       </Typography>
                     </Box>
+
+                    {/* 店長承認警告 */}
+                    {requiresManagerApproval && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                          <Typography variant="body2">
+                            店長承認が必要な値引きが含まれています。受注確定前に店長の承認を取得してください。
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setShowManagerApprovalDialog(true)}
+                            sx={{ ml: 2 }}
+                          >
+                            承認確認
+                          </Button>
+                        </Box>
+                      </Alert>
+                    )}
                   </Box>
                 )}
               </CardContent>
@@ -1570,10 +1572,7 @@ const OrderEntryPage: React.FC = () => {
                           checked={isPartialPayment}
                           onChange={(e) => {
                             setIsPartialPayment(e.target.checked);
-                            if (!e.target.checked) {
-                              const finalAmount = calculateTotals().finalAmount;
-                              setPaidAmount(finalAmount);
-                            }
+                            // useEffectで自動更新されるため、手動設定は不要
                           }}
                         />
                       }
@@ -2027,7 +2026,7 @@ const OrderEntryPage: React.FC = () => {
                       bgcolor: isApplicable ? 'action.hover' : 'inherit'
                     }
                   }}
-                  onClick={() => isApplicable && applyDiscount(discount)}
+                  onClick={() => isApplicable && selectDiscountForApply(discount)}
                 >
                   <CardContent>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -2096,6 +2095,183 @@ const OrderEntryPage: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setShowDiscountDialog(false)}>
             キャンセル
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 店長承認ダイアログ */}
+      <Dialog
+        open={showManagerApprovalDialog}
+        onClose={() => setShowManagerApprovalDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>店長承認</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            以下の値引きには店長承認が必要です：
+          </Typography>
+          
+          {appliedDiscounts.filter(d => d.discount?.requiresManagerApproval).map((discount) => (
+            <Box key={discount.id} sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+              <Typography variant="subtitle1" fontWeight="bold">
+                {discount.discountName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                値引き額: ¥{discount.discountAmount.toLocaleString()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {discount.discount?.description}
+              </Typography>
+            </Box>
+          ))}
+
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              承認コメント（任意）：
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              value={managerApprovalComment}
+              onChange={(e) => setManagerApprovalComment(e.target.value)}
+              placeholder="承認理由やコメントを入力してください"
+              variant="outlined"
+            />
+          </Box>
+
+          {managerApprovalStatus === 'denied' && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              店長承認が否認されました。値引きを削除するか、別の値引きを選択してください。
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setManagerApprovalStatus('denied');
+              setShowManagerApprovalDialog(false);
+              // 承認が必要な値引きを削除
+              setAppliedDiscounts(prev => prev.filter(d => !d.discount?.requiresManagerApproval));
+              setRequiresManagerApproval(false);
+            }}
+            color="error"
+          >
+            否認
+          </Button>
+          <Button 
+            onClick={() => {
+              setManagerApprovalStatus('approved');
+              setShowManagerApprovalDialog(false);
+              setRequiresManagerApproval(false);
+            }}
+            variant="contained"
+            color="primary"
+          >
+            承認
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 値引き適用コメントダイアログ */}
+      <Dialog
+        open={showDiscountCommentDialog}
+        onClose={() => {
+          setShowDiscountCommentDialog(false);
+          setSelectedDiscountForApply(null);
+          setDiscountApplyComment('');
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>値引き適用確認</DialogTitle>
+        <DialogContent>
+          {selectedDiscountForApply && (
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                以下の値引きを適用します：
+              </Typography>
+              <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 2 }}>
+                <Typography variant="h6" color="primary" gutterBottom>
+                  {selectedDiscountForApply.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedDiscountForApply.type === 'percentage' 
+                    ? `${selectedDiscountForApply.value}%割引`
+                    : `${selectedDiscountForApply.value.toLocaleString()}円引き`}
+                </Typography>
+                <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                  値引き額: {formatCurrency(calculateDiscount(selectedDiscountForApply, orderItems.reduce((total, item) => total + item.totalPrice, 0)))}
+                </Typography>
+                {selectedDiscountForApply.requiresManagerApproval && (
+                  <Chip label="要店長確認" color="warning" size="small" sx={{ mt: 1 }} />
+                )}
+              </Box>
+              
+              {/* 店長承認が必要な場合の確認チェック */}
+              {selectedDiscountForApply.requiresManagerApproval && (
+                <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.50', borderRadius: 1, border: '1px solid', borderColor: 'warning.200' }}>
+                  <Typography variant="body2" color="warning.dark" gutterBottom>
+                    <strong>店長承認が必要な値引きです</strong>
+                  </Typography>
+                  <Box display="flex" alignItems="center" sx={{ mt: 1 }}>
+                    <input
+                      type="checkbox"
+                      id="managerApprovalCheck"
+                      checked={managerApprovalConfirmed}
+                      onChange={(e) => setManagerApprovalConfirmed(e.target.checked)}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Typography variant="body2" component="label" htmlFor="managerApprovalCheck">
+                      店長に口頭で確認し、承認を得ています
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+              
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label={selectedDiscountForApply.requiresManagerApproval 
+                  ? "確認コメント（必須）" 
+                  : "備考・コメント（任意）"}
+                value={discountApplyComment}
+                onChange={(e) => setDiscountApplyComment(e.target.value)}
+                placeholder={selectedDiscountForApply.requiresManagerApproval 
+                  ? "店長の指示内容や承認理由を記入してください" 
+                  : "例：常連のお客様、キャンペーン適用など（任意）"}
+                helperText={selectedDiscountForApply.requiresManagerApproval 
+                  ? "店長承認が必要な値引きには確認コメントの入力が必須です" 
+                  : "値引きを適用する理由があれば記入してください（任意）"}
+                sx={{ mt: 2 }}
+                required={selectedDiscountForApply.requiresManagerApproval}
+                error={selectedDiscountForApply.requiresManagerApproval && managerApprovalConfirmed && !discountApplyComment.trim()}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setShowDiscountCommentDialog(false);
+              setSelectedDiscountForApply(null);
+              setDiscountApplyComment('');
+            }}
+          >
+            キャンセル
+          </Button>
+          <Button
+            variant="contained"
+            onClick={applyDiscount}
+            disabled={
+              selectedDiscountForApply?.requiresManagerApproval
+                ? (!managerApprovalConfirmed || !discountApplyComment.trim())
+                : false
+            }
+          >
+            値引き適用
           </Button>
         </DialogActions>
       </Dialog>

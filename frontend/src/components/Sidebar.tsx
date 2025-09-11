@@ -63,6 +63,12 @@ const navigationItems: NavigationItem[] = [
     icon: PurchaseOrderIcon,
   },
   {
+    path: '/stock-replenishment',
+    label: '在庫発注',
+    icon: InventoryIcon,
+    requiredPermissions: ['manager', 'admin'],
+  },
+  {
     path: '/individual-management',
     label: '個体管理',
     icon: QrCodeIcon,

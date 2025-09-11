@@ -505,6 +505,7 @@ const OrderListPage: React.FC = () => {
                   <TableCell>担当者</TableCell>
                   <TableCell>商品数</TableCell>
                   <TableCell align="right">金額</TableCell>
+                  <TableCell align="right">値引き額</TableCell>
                   <TableCell align="right">入金額</TableCell>
                   <TableCell align="right">残金</TableCell>
                   <TableCell>支払方法</TableCell>
@@ -550,6 +551,13 @@ const OrderListPage: React.FC = () => {
                     <TableCell align="right">
                       <Typography variant="body2" fontWeight="bold">
                         {formatCurrency(order.totalAmount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" color="error">
+                        {order.discounts && order.discounts.length > 0
+                          ? formatCurrency(order.discounts.reduce((sum, d) => sum + (d.discountAmount || 0), 0))
+                          : '-'}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -731,6 +739,19 @@ const OrderListPage: React.FC = () => {
                 </Box>
                 <Box>
                   <Typography>小計: {formatCurrency(selectedOrder.subtotalAmount)}</Typography>
+                  {selectedOrder.discounts && selectedOrder.discounts.length > 0 && (
+                    <>
+                      <Typography color="error">
+                        値引き: {formatCurrency(selectedOrder.discounts.reduce((sum, d) => sum + (d.discountAmount || 0), 0))}
+                      </Typography>
+                      {selectedOrder.discounts.map((discount, idx) => (
+                        <Typography key={idx} variant="body2" color="text.secondary" sx={{ pl: 2 }}>
+                          - {discount.discountName}: {formatCurrency(discount.discountAmount)}
+                          {discount.approvedBy ? ' (承認済み)' : discount.discountValue > 10 ? ' (要承認)' : ''}
+                        </Typography>
+                      ))}
+                    </>
+                  )}
                   <Typography>消費税: {formatCurrency(selectedOrder.taxAmount)}</Typography>
                   <Typography><strong>合計: {formatCurrency(selectedOrder.totalAmount)}</strong></Typography>
                   <Typography>入金額: {formatCurrency(selectedOrder.paidAmount)}</Typography>

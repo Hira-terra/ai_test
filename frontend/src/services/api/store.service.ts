@@ -9,6 +9,25 @@ const getAuthToken = () => {
   return localStorage.getItem('auth_token');
 };
 
+// 認証なしAPIクライアント（店舗一覧取得用）
+const publicApiClient = {
+  get: async (url: string) => {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    return response.json();
+  }
+};
+
 // APIクライアント
 const apiClient = {
   get: async (url: string) => {
@@ -88,12 +107,12 @@ const apiClient = {
 
 // 実店舗APIサービス
 export const apiStoreService = {
-  // 店舗一覧取得
+  // 店舗一覧取得（認証不要）
   getAllStores: async (): Promise<ApiResponse<Store[]>> => {
-    console.info('✅ Using REAL API for stores');
+    console.info('✅ Using REAL API for stores (public)');
     
     try {
-      const response = await apiClient.get(API_ENDPOINTS.STORES.LIST);
+      const response = await publicApiClient.get(API_ENDPOINTS.STORES.LIST);
       // responseは既に { success: true, data: [...] } 形式
       return response;
     } catch (error: any) {

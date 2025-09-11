@@ -167,6 +167,11 @@ export class OrderService {
         prescriptionId?: string;
         notes?: string;
       }>;
+      discounts?: Array<{
+        discountId: string;
+        discountAmount: number;
+        originalAmount: number;
+      }>;
       deliveryDate?: string;
       paymentMethod: PaymentMethod;
       paidAmount?: number;
@@ -238,12 +243,33 @@ export class OrderService {
 
       const order = await this.orderRepo.createOrder(createData);
 
+      // 値引きがある場合は保存
+      if (orderData.discounts && orderData.discounts.length > 0) {
+        logger.info(`[OrderService:createOrder] 値引き保存開始 - ${operationId}`, {
+          discountCount: orderData.discounts.length,
+          discounts: orderData.discounts
+        });
+        
+        for (const discountData of orderData.discounts) {
+          await this.orderRepo.addOrderDiscount({
+            orderId: order.id,
+            discountId: discountData.discountId,
+            discountAmount: discountData.discountAmount,
+            originalAmount: discountData.originalAmount,
+            createdBy: createdBy
+          });
+        }
+        
+        logger.info(`[OrderService:createOrder] 値引き保存完了 - ${operationId}`);
+      }
+
       const duration = Date.now() - startTime;
       logger.info(`[OrderService:createOrder] 受注作成成功 - ${operationId}`, {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount,
         paidAmount,
+        discountCount: orderData.discounts?.length || 0,
         duration: `${duration}ms`
       });
 

@@ -16,6 +16,12 @@ router.get('/suppliers', purchaseOrderController.getSuppliers);
 // 発注統計取得
 router.get('/statistics', purchaseOrderController.getStatistics);
 
+// 在庫管理関連（specificなルートなので先に配置）
+router.get('/stock-levels', purchaseOrderController.getStockLevels);
+router.get('/stock-alerts', purchaseOrderController.getStockAlerts);
+router.get('/suggested-orders', purchaseOrderController.getSuggestedOrders);
+router.post('/stock-replenishment', purchaseOrderController.createStockReplenishment);
+
 // 発注履歴取得（specificなルートなので先に配置）
 router.get('/history', purchaseOrderController.getPurchaseOrderHistory);
 

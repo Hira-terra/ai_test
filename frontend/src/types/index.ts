@@ -141,13 +141,21 @@ export const API_ENDPOINTS = {
     LIST: '/purchase-orders',
     DETAIL: (id: string) => `/purchase-orders/${id}`,
     CREATE: '/purchase-orders',
+    CREATE_ORDER_BASED: '/purchase-orders/order-based', // 受注発注作成
+    CREATE_STOCK_REPLENISHMENT: '/purchase-orders/stock-replenishment', // 在庫発注作成
     UPDATE: (id: string) => `/purchase-orders/${id}`,
     SEND: (id: string) => `/purchase-orders/${id}/send`,
     CONFIRM: (id: string) => `/purchase-orders/${id}/confirm`,
     CANCEL: (id: string) => `/purchase-orders/${id}/cancel`,
+    HISTORY: '/purchase-orders/history',
     
     // 発注可能受注取得
     AVAILABLE_ORDERS: '/purchase-orders/available-orders',
+    
+    // 在庫発注用
+    STOCK_LEVELS: '/purchase-orders/stock-levels',
+    STOCK_ALERTS: '/purchase-orders/stock-alerts',
+    SUGGESTED_ORDERS: '/purchase-orders/suggested-orders', // 自動発注提案
     
     // 仕入先管理
     SUPPLIERS: '/purchase-orders/suppliers'
@@ -760,6 +768,9 @@ export interface OrderDiscount {
   approvedByUser?: User;
   approvedAt?: DateString;
   
+  // 適用理由・メモ
+  notes?: string;
+  
   createdAt: DateString;
 }
 
@@ -820,6 +831,7 @@ export interface PurchaseOrder {
   expectedDeliveryDate?: DateString;
   actualDeliveryDate?: DateString;
   status: PurchaseOrderStatus;
+  type: PurchaseOrderType; // 発注種別：受注発注 or 在庫発注
   subtotalAmount: number;
   taxAmount: number;
   totalAmount: number;
@@ -835,10 +847,12 @@ export interface PurchaseOrder {
 
 export type PurchaseOrderStatus = 'draft' | 'sent' | 'confirmed' | 'partially_delivered' | 'delivered' | 'cancelled';
 
+export type PurchaseOrderType = 'order_based' | 'stock_replenishment'; // 受注発注 | 在庫発注
+
 export interface PurchaseOrderItem {
   id: UUID;
   purchaseOrderId: UUID;
-  orderId: UUID; // 元受注ID
+  orderId?: UUID; // 元受注ID（在庫発注の場合はnull）
   order?: Order;
   productId: UUID;
   product?: Product;
@@ -849,18 +863,32 @@ export interface PurchaseOrderItem {
   totalCost: number;
   specifications?: string; // 度数等の仕様詳細
   notes?: string;
+  targetStockLevel?: number; // 目標在庫数（在庫発注の場合のみ）
+  currentStockLevel?: number; // 現在在庫数（在庫発注の場合のみ）
 }
 
 export interface CreatePurchaseOrderRequest {
   supplierId: UUID;
+  type: PurchaseOrderType;
   expectedDeliveryDate?: DateString;
-  orderIds: UUID[]; // 対象受注ID群
+  orderIds?: UUID[]; // 対象受注ID群（受注発注の場合）
+  stockItems?: CreateStockPurchaseOrderItem[]; // 在庫発注商品（在庫発注の場合）
+  notes?: string;
+}
+
+export interface CreateStockPurchaseOrderItem {
+  productId: UUID;
+  quantity: number;
+  unitCost?: number; // 指定しない場合は商品マスタのcostPriceを使用
+  targetStockLevel?: number;
+  currentStockLevel?: number;
   notes?: string;
 }
 
 export interface PurchaseOrderSearchParams {
   supplierId?: UUID;
   status?: PurchaseOrderStatus;
+  type?: PurchaseOrderType; // 発注種別によるフィルタ
   orderDateFrom?: DateString;
   orderDateTo?: DateString;
   expectedDeliveryFrom?: DateString;
@@ -868,6 +896,38 @@ export interface PurchaseOrderSearchParams {
   page?: number;
   limit?: number;
   sort?: string;
+}
+
+// 在庫レベル管理用の型
+export interface StockLevel {
+  id: UUID;
+  productId: UUID;
+  product?: Product;
+  storeId: UUID;
+  store?: Store;
+  currentQuantity: number;
+  safetyStock: number; // 安全在庫数
+  maxStock: number; // 最大在庫数
+  lastOrderQuantity?: number;
+  lastOrderDate?: DateString;
+  averageUsage?: number; // 平均使用量（月間等）
+  autoOrderEnabled: boolean; // 自動発注有効フラグ
+  notes?: string;
+  createdAt: DateString;
+  updatedAt: DateString;
+}
+
+export interface StockLevelAlert {
+  id: UUID;
+  stockLevelId: UUID;
+  stockLevel?: StockLevel;
+  alertType: 'low_stock' | 'out_of_stock' | 'overstocked';
+  currentQuantity: number;
+  thresholdQuantity: number;
+  suggestedOrderQuantity?: number;
+  isResolved: boolean;
+  resolvedAt?: DateString;
+  createdAt: DateString;
 }
 
 // =================================================================

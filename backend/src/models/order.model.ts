@@ -84,6 +84,13 @@ export class OrderModel {
           LEFT JOIN frames f ON oi.frame_id = f.id
           WHERE oi.order_id = o.id 
           AND p.category IN ('frame', 'contact', 'accessory')
+          AND (
+            -- フレーム商品の場合は個体番号がnullの場合のみ発注対象（在庫品選択時は除外）
+            (p.category = 'frame' AND oi.frame_id IS NULL)
+            OR
+            -- コンタクト・アクセサリーは常に発注対象
+            (p.category IN ('contact', 'accessory'))
+          )
           AND NOT EXISTS (
             SELECT 1 FROM purchase_order_items poi
             WHERE poi.order_id = o.id AND poi.product_id = p.id
@@ -622,14 +629,23 @@ export class OrderRepository {
     const orders = result.rows.map((row: any) => this.transformToOrder(row));
     const total = parseInt(countResult.rows[0].total);
 
-    // 各受注の明細と入金情報を取得
+    // 各受注の明細、入金情報、値引き情報を取得
     for (const order of orders) {
-      const [items, payments] = await Promise.all([
+      const [items, payments, discounts] = await Promise.all([
         this.findOrderItems(order.id),
-        this.findPayments(order.id)
+        this.findPayments(order.id),
+        this.findOrderDiscounts(order.id)
       ]);
       order.items = items;
       order.payments = payments;
+      order.discounts = discounts;
+      
+      // 値引き後の金額を再計算
+      if (discounts && discounts.length > 0) {
+        const totalDiscountAmount = discounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
+        order.totalAmount = Math.max(0, order.subtotalAmount + order.taxAmount - totalDiscountAmount);
+        order.balanceAmount = Math.max(0, order.totalAmount - order.paidAmount);
+      }
     }
 
     return { orders, total };
@@ -662,14 +678,23 @@ export class OrderRepository {
 
     const order = this.transformToOrder(result.rows[0]);
     
-    // 明細と入金情報を取得
-    const [items, payments] = await Promise.all([
+    // 明細、入金情報、値引き情報を取得
+    const [items, payments, discounts] = await Promise.all([
       this.findOrderItems(order.id),
-      this.findPayments(order.id)
+      this.findPayments(order.id),
+      this.findOrderDiscounts(order.id)
     ]);
     
     order.items = items;
     order.payments = payments;
+    order.discounts = discounts;
+    
+    // 値引き後の金額を再計算
+    if (discounts && discounts.length > 0) {
+      const totalDiscountAmount = discounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
+      order.totalAmount = Math.max(0, order.subtotalAmount + order.taxAmount - totalDiscountAmount);
+      order.balanceAmount = Math.max(0, order.totalAmount - order.paidAmount);
+    }
 
     return order;
   }
@@ -749,6 +774,84 @@ export class OrderRepository {
 
     const result = await this.db.query(query, [orderId]);
     return result.rows.map((row: any) => this.transformToPayment(row));
+  }
+
+  // 受注値引き保存
+  async addOrderDiscount(discountData: {
+    orderId: string;
+    discountId: string;
+    discountAmount: number;
+    originalAmount: number;
+    createdBy: string;
+  }): Promise<void> {
+    // 値引きの詳細情報を取得
+    const discountQuery = `
+      SELECT discount_code, name, type, value 
+      FROM discounts 
+      WHERE id = $1
+    `;
+    const discountResult = await this.db.query(discountQuery, [discountData.discountId]);
+    
+    if (discountResult.rows.length === 0) {
+      throw new Error(`Discount not found: ${discountData.discountId}`);
+    }
+    
+    const discount = discountResult.rows[0];
+    
+    const insertQuery = `
+      INSERT INTO order_discounts (
+        id, order_id, discount_id, discount_code, discount_name,
+        discount_type, discount_value, original_amount, discount_amount,
+        discounted_amount, created_at
+      ) VALUES (
+        gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP
+      )
+    `;
+    
+    await this.db.query(insertQuery, [
+      discountData.orderId,
+      discountData.discountId,
+      discount.discount_code,
+      discount.name,
+      discount.type,
+      discount.value,
+      discountData.originalAmount,
+      discountData.discountAmount,
+      discountData.originalAmount - discountData.discountAmount
+    ]);
+  }
+
+  // 受注値引き情報取得
+  async findOrderDiscounts(orderId: string): Promise<any[]> {
+    const query = `
+      SELECT 
+        od.*,
+        d.discount_code,
+        d.name as discount_name,
+        d.type as discount_type,
+        d.value as discount_value
+      FROM order_discounts od
+      LEFT JOIN discounts d ON od.discount_id = d.id
+      WHERE od.order_id = $1
+      ORDER BY od.created_at DESC
+    `;
+
+    const result = await this.db.query(query, [orderId]);
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      orderId: row.order_id,
+      discountId: row.discount_id,
+      discountCode: row.discount_code,
+      discountName: row.discount_name,
+      discountType: row.discount_type,
+      discountValue: row.discount_value,
+      originalAmount: parseFloat(row.original_amount || '0'),
+      discountAmount: parseFloat(row.discount_amount || '0'),
+      discountedAmount: parseFloat(row.discounted_amount || '0'),
+      approvedBy: row.approved_by,
+      approvedAt: row.approved_at,
+      createdAt: row.created_at
+    }));
   }
 
   // 受注作成

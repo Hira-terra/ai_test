@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus } from '../types';
+import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, PurchaseOrderType, CreateStockPurchaseOrderItem } from '../types';
 
 export class PurchaseOrderModel {
   constructor(private db: Pool) {}
@@ -89,6 +89,7 @@ export class PurchaseOrderModel {
         po.expected_delivery_date as "expectedDeliveryDate",
         po.actual_delivery_date as "actualDeliveryDate",
         po.status,
+        po.type,
         po.subtotal_amount as "subtotalAmount",
         po.tax_amount as "taxAmount",
         po.total_amount as "totalAmount",
@@ -145,6 +146,7 @@ export class PurchaseOrderModel {
         po.expected_delivery_date as "expectedDeliveryDate",
         po.actual_delivery_date as "actualDeliveryDate",
         po.status,
+        po.type,
         po.subtotal_amount as "subtotalAmount",
         po.tax_amount as "taxAmount",
         po.total_amount as "totalAmount",
@@ -198,6 +200,8 @@ export class PurchaseOrderModel {
         poi.total_cost as "totalCost",
         poi.specifications,
         poi.notes,
+        poi.target_stock_level as "targetStockLevel",
+        poi.current_stock_level as "currentStockLevel",
         -- 商品情報
         p.id as "product.id",
         p.product_code as "product.productCode",
@@ -221,9 +225,24 @@ export class PurchaseOrderModel {
   }
 
   /**
-   * 発注を作成
+   * 受注ベース発注を作成
    */
   async create(purchaseOrderData: {
+    purchaseOrderNumber: string;
+    supplierId: string;
+    storeId: string;
+    expectedDeliveryDate?: string;
+    orderIds: string[];
+    notes?: string;
+    createdBy: string;
+  }, clientParam?: any): Promise<PurchaseOrder> {
+    return this.createOrderBased(purchaseOrderData, clientParam);
+  }
+
+  /**
+   * 受注ベース発注を作成
+   */
+  async createOrderBased(purchaseOrderData: {
     purchaseOrderNumber: string;
     supplierId: string;
     storeId: string;
@@ -243,8 +262,8 @@ export class PurchaseOrderModel {
       // 発注レコードを作成
       const insertPOQuery = `
         INSERT INTO purchase_orders (
-          purchase_order_number, supplier_id, store_id, expected_delivery_date, notes, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6)
+          purchase_order_number, supplier_id, store_id, expected_delivery_date, type, notes, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
       `;
       
@@ -253,6 +272,7 @@ export class PurchaseOrderModel {
         purchaseOrderData.supplierId,
         purchaseOrderData.storeId,
         purchaseOrderData.expectedDeliveryDate || null,
+        'order_based',
         purchaseOrderData.notes || null,
         purchaseOrderData.createdBy
       ]);
@@ -327,6 +347,7 @@ export class PurchaseOrderModel {
           po.expected_delivery_date as "expectedDeliveryDate",
           po.actual_delivery_date as "actualDeliveryDate",
           po.status,
+          po.type,
           po.subtotal_amount as "subtotalAmount",
           po.tax_amount as "taxAmount",
           po.total_amount as "totalAmount",
@@ -359,7 +380,9 @@ export class PurchaseOrderModel {
           poi.unit_cost as "unitCost",
           poi.total_cost as "totalCost",
           poi.specifications,
-          poi.notes
+          poi.notes,
+          poi.target_stock_level as "targetStockLevel",
+          poi.current_stock_level as "currentStockLevel"
         FROM purchase_order_items poi
         WHERE poi.purchase_order_id = $1
       `;
@@ -375,7 +398,9 @@ export class PurchaseOrderModel {
         unitCost: parseFloat(row.unitCost),
         totalCost: parseFloat(row.totalCost),
         specifications: row.specifications,
-        notes: row.notes
+        notes: row.notes,
+        targetStockLevel: row.targetStockLevel,
+        currentStockLevel: row.currentStockLevel
       }));
       
       if (shouldManageTransaction) {
@@ -389,6 +414,178 @@ export class PurchaseOrderModel {
         await client.query('ROLLBACK');
       }
       console.error('[PurchaseOrder] Create error:', error);
+      throw error;
+    } finally {
+      if (shouldManageTransaction) {
+        client.release();
+      }
+    }
+  }
+
+  /**
+   * 在庫発注を作成
+   */
+  async createStockReplenishment(purchaseOrderData: {
+    purchaseOrderNumber: string;
+    supplierId: string;
+    storeId: string;
+    expectedDeliveryDate?: string;
+    stockItems: CreateStockPurchaseOrderItem[];
+    notes?: string;
+    createdBy: string;
+  }, clientParam?: any): Promise<PurchaseOrder> {
+    const client = clientParam || await this.db.connect();
+    const shouldManageTransaction = !clientParam;
+    
+    try {
+      if (shouldManageTransaction) {
+        await client.query('BEGIN');
+      }
+
+      // 在庫発注レコードを作成
+      const insertPOQuery = `
+        INSERT INTO purchase_orders (
+          purchase_order_number, supplier_id, store_id, expected_delivery_date, type, notes, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
+      `;
+      
+      const insertPoResult = await client.query(insertPOQuery, [
+        purchaseOrderData.purchaseOrderNumber,
+        purchaseOrderData.supplierId,
+        purchaseOrderData.storeId,
+        purchaseOrderData.expectedDeliveryDate || null,
+        'stock_replenishment',
+        purchaseOrderData.notes || null,
+        purchaseOrderData.createdBy
+      ]);
+      
+      const purchaseOrderId = insertPoResult.rows[0].id;
+
+      // 在庫発注明細を作成
+      let totalItems = 0;
+      
+      for (const stockItem of purchaseOrderData.stockItems) {
+        // 商品の仕入原価を取得（指定がない場合）
+        let unitCost = stockItem.unitCost;
+        if (!unitCost) {
+          const costQuery = 'SELECT cost_price FROM products WHERE id = $1';
+          const costResult = await client.query(costQuery, [stockItem.productId]);
+          unitCost = parseFloat(costResult.rows[0]?.cost_price || '0');
+        }
+
+        const totalCost = unitCost * stockItem.quantity;
+        
+        const insertItemQuery = `
+          INSERT INTO purchase_order_items (
+            purchase_order_id, product_id, quantity, unit_cost, total_cost,
+            target_stock_level, current_stock_level, notes
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `;
+        
+        console.log(`[StockOrder] Adding stock item: productId=${stockItem.productId}, quantity=${stockItem.quantity}, unitCost=${unitCost}`);
+        
+        await client.query(insertItemQuery, [
+          purchaseOrderId,
+          stockItem.productId,
+          stockItem.quantity,
+          unitCost,
+          totalCost,
+          stockItem.targetStockLevel || null,
+          stockItem.currentStockLevel || null,
+          stockItem.notes || null
+        ]);
+        
+        totalItems++;
+      }
+      
+      if (totalItems === 0) {
+        throw new Error('在庫発注対象の商品がありません');
+      }
+
+      // 合計金額を計算・更新
+      await this.updateTotals(client, purchaseOrderId);
+      
+      // 作成した発注を取得して返却
+      console.log('[StockOrder] Fetching created stock purchase order:', purchaseOrderId);
+      
+      const getPOQuery = `
+        SELECT 
+          po.id,
+          po.purchase_order_number as "purchaseOrderNumber",
+          po.supplier_id as "supplierId",
+          po.store_id as "storeId",
+          po.order_date as "orderDate",
+          po.expected_delivery_date as "expectedDeliveryDate",
+          po.actual_delivery_date as "actualDeliveryDate",
+          po.status,
+          po.type,
+          po.subtotal_amount as "subtotalAmount",
+          po.tax_amount as "taxAmount",
+          po.total_amount as "totalAmount",
+          po.notes,
+          po.sent_at as "sentAt",
+          po.confirmed_at as "confirmedAt",
+          po.created_by as "createdBy",
+          po.created_at as "createdAt",
+          po.updated_at as "updatedAt"
+        FROM purchase_orders po
+        WHERE po.id = $1
+      `;
+      
+      const fetchPoResult = await client.query(getPOQuery, [purchaseOrderId]);
+      if (fetchPoResult.rows.length === 0) {
+        throw new Error(`作成した在庫発注が見つかりません: ${purchaseOrderId}`);
+      }
+      
+      const purchaseOrder = this.transformRow(fetchPoResult.rows[0]) as PurchaseOrder;
+      
+      // 発注明細を取得
+      const getItemsQuery = `
+        SELECT 
+          poi.id,
+          poi.purchase_order_id as "purchaseOrderId",
+          poi.order_id as "orderId",
+          poi.product_id as "productId",
+          poi.prescription_id as "prescriptionId",
+          poi.quantity,
+          poi.unit_cost as "unitCost",
+          poi.total_cost as "totalCost",
+          poi.specifications,
+          poi.notes,
+          poi.target_stock_level as "targetStockLevel",
+          poi.current_stock_level as "currentStockLevel"
+        FROM purchase_order_items poi
+        WHERE poi.purchase_order_id = $1
+      `;
+      
+      const itemsResult = await client.query(getItemsQuery, [purchaseOrderId]);
+      purchaseOrder.items = itemsResult.rows.map((row: any) => ({
+        id: row.id,
+        purchaseOrderId: row.purchaseOrderId,
+        orderId: row.orderId,
+        productId: row.productId,
+        prescriptionId: row.prescriptionId,
+        quantity: row.quantity,
+        unitCost: parseFloat(row.unitCost),
+        totalCost: parseFloat(row.totalCost),
+        specifications: row.specifications,
+        notes: row.notes,
+        targetStockLevel: row.targetStockLevel,
+        currentStockLevel: row.currentStockLevel
+      }));
+      
+      if (shouldManageTransaction) {
+        await client.query('COMMIT');
+      }
+      
+      return purchaseOrder;
+      
+    } catch (error) {
+      if (shouldManageTransaction) {
+        await client.query('ROLLBACK');
+      }
+      console.error('[StockOrder] Create error:', error);
       throw error;
     } finally {
       if (shouldManageTransaction) {
@@ -494,6 +691,7 @@ export class PurchaseOrderModel {
       expectedDeliveryDate: row.expectedDeliveryDate,
       actualDeliveryDate: row.actualDeliveryDate,
       status: row.status,
+      type: row.type,
       subtotalAmount: parseFloat(row.subtotalAmount || '0'),
       taxAmount: parseFloat(row.taxAmount || '0'),
       totalAmount: parseFloat(row.totalAmount || '0'),
@@ -676,7 +874,9 @@ export class PurchaseOrderModel {
       unitCost: parseFloat(row.unitCost || '0'),
       totalCost: parseFloat(row.totalCost || '0'),
       specifications: row.specifications,
-      notes: row.notes
+      notes: row.notes,
+      targetStockLevel: row.targetStockLevel,
+      currentStockLevel: row.currentStockLevel
     };
   }
 }

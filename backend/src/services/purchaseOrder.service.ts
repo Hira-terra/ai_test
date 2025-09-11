@@ -8,16 +8,20 @@ import {
   PurchaseOrder, 
   PurchaseOrderItem,
   PurchaseOrderStatus,
+  PurchaseOrderType,
+  CreateStockPurchaseOrderItem,
   Order, 
   Supplier,
   ValidationError,
   NotFoundError 
 } from '../types';
+import { StockLevelModel } from '../models/stockLevel.model';
 
 export class PurchaseOrderService {
   private purchaseOrderModel: PurchaseOrderModel;
   private orderModel: OrderModel;
   private supplierModel: SupplierModel;
+  private stockLevelModel: StockLevelModel;
   private pool: Pool;
 
   constructor() {
@@ -25,6 +29,7 @@ export class PurchaseOrderService {
     this.purchaseOrderModel = new PurchaseOrderModel(this.pool);
     this.orderModel = new OrderModel(this.pool);
     this.supplierModel = new SupplierModel(this.pool);
+    this.stockLevelModel = new StockLevelModel(this.pool);
     logger.info('[PurchaseOrderService] 初期化完了');
   }
 
@@ -266,9 +271,14 @@ export class PurchaseOrderService {
       
       // ステータスに応じて受注ステータスも更新
       if (status === 'delivered') {
-        // 発注に含まれる受注のステータスを「レンズ受領」に更新
-        const orderIds = updatedPurchaseOrder.items.map(item => item.orderId);
-        await this.orderModel.updateMultipleStatus(orderIds, 'lens_received');
+        // 発注に含まれる受注のステータスを「レンズ受領」に更新（在庫発注の場合はスキップ）
+        const orderIds = updatedPurchaseOrder.items
+          .map(item => item.orderId)
+          .filter((orderId): orderId is string => orderId !== null && orderId !== undefined);
+        
+        if (orderIds.length > 0) {
+          await this.orderModel.updateMultipleStatus(orderIds, 'lens_received');
+        }
       }
       
       logger.info('[PurchaseOrderService] 発注ステータス更新完了', { 
@@ -398,6 +408,167 @@ export class PurchaseOrderService {
       return statistics;
     } catch (error) {
       logger.error('[PurchaseOrderService] 発注統計取得エラー', { 
+        error: error instanceof Error ? error.message : error 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫発注を作成
+   */
+  async createStockReplenishment(purchaseOrderData: {
+    supplierId: string;
+    storeId: string;
+    expectedDeliveryDate?: string;
+    stockItems: CreateStockPurchaseOrderItem[];
+    notes?: string;
+    createdBy: string;
+  }): Promise<PurchaseOrder> {
+    try {
+      logger.info('[PurchaseOrderService] 在庫発注作成開始', { 
+        supplierId: purchaseOrderData.supplierId,
+        storeId: purchaseOrderData.storeId,
+        itemCount: purchaseOrderData.stockItems.length
+      });
+
+      // バリデーション
+      if (!purchaseOrderData.stockItems || purchaseOrderData.stockItems.length === 0) {
+        throw new ValidationError('在庫発注には商品が必要です', []);
+      }
+
+      // 仕入先存在確認
+      const supplier = await this.supplierModel.findById(purchaseOrderData.supplierId);
+      if (!supplier) {
+        throw new ValidationError('指定された仕入先が見つかりません', []);
+      }
+
+      // 発注番号生成（在庫発注用）
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+      const purchaseOrderNumber = `ST${dateStr}${timeStr}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+
+      // 在庫発注作成
+      const purchaseOrder = await this.purchaseOrderModel.createStockReplenishment({
+        purchaseOrderNumber,
+        supplierId: purchaseOrderData.supplierId,
+        storeId: purchaseOrderData.storeId,
+        expectedDeliveryDate: purchaseOrderData.expectedDeliveryDate,
+        stockItems: purchaseOrderData.stockItems,
+        notes: purchaseOrderData.notes,
+        createdBy: purchaseOrderData.createdBy
+      });
+
+      logger.info('[PurchaseOrderService] 在庫発注作成完了', { 
+        id: purchaseOrder.id,
+        purchaseOrderNumber: purchaseOrder.purchaseOrderNumber,
+        itemCount: purchaseOrder.items.length,
+        totalAmount: purchaseOrder.totalAmount
+      });
+
+      // 在庫発注は作成と同時に自動送信（sent）ステータスにする
+      const sentPurchaseOrder = await this.purchaseOrderModel.send(purchaseOrder.id, purchaseOrderData.createdBy);
+      
+      if (sentPurchaseOrder) {
+        logger.info('[PurchaseOrderService] 在庫発注自動送信完了', { 
+          id: sentPurchaseOrder.id,
+          status: sentPurchaseOrder.status
+        });
+        return sentPurchaseOrder;
+      }
+
+      return purchaseOrder;
+    } catch (error) {
+      logger.error('[PurchaseOrderService] 在庫発注作成エラー', { 
+        supplierId: purchaseOrderData.supplierId,
+        storeId: purchaseOrderData.storeId,
+        error: error instanceof Error ? error.message : error 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫レベル一覧を取得
+   */
+  async getStockLevels(params?: {
+    storeId?: string;
+    productId?: string;
+    lowStockOnly?: boolean;
+    autoOrderEnabled?: boolean;
+    productCategory?: string;
+    limit?: number;
+    offset?: number;
+    sort?: string;
+  }) {
+    try {
+      logger.info('[PurchaseOrderService] 在庫レベル一覧取得開始', params);
+
+      const result = await this.stockLevelModel.findAll(params);
+
+      logger.info('[PurchaseOrderService] 在庫レベル一覧取得完了', { 
+        count: result.stockLevels.length,
+        total: result.total 
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('[PurchaseOrderService] 在庫レベル一覧取得エラー', { 
+        error: error instanceof Error ? error.message : error 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 在庫アラートを取得
+   */
+  async getStockAlerts(params?: {
+    storeId?: string;
+    alertType?: 'low_stock' | 'out_of_stock' | 'overstocked';
+    isResolved?: boolean;
+    limit?: number;
+    offset?: number;
+  }) {
+    try {
+      logger.info('[PurchaseOrderService] 在庫アラート取得開始', params);
+
+      const result = await this.stockLevelModel.findAlerts(params);
+
+      logger.info('[PurchaseOrderService] 在庫アラート取得完了', { 
+        count: result.alerts.length,
+        total: result.total 
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('[PurchaseOrderService] 在庫アラート取得エラー', { 
+        error: error instanceof Error ? error.message : error 
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 自動発注提案を取得
+   */
+  async getSuggestedOrders(storeId: string) {
+    try {
+      logger.info('[PurchaseOrderService] 自動発注提案取得開始', { storeId });
+
+      const suggestions = await this.stockLevelModel.getSuggestedOrders(storeId);
+
+      logger.info('[PurchaseOrderService] 自動発注提案取得完了', { 
+        storeId,
+        suggestionCount: suggestions.length,
+        totalSuggestedCost: suggestions.reduce((sum, s) => sum + s.suggestedCost, 0)
+      });
+
+      return suggestions;
+    } catch (error) {
+      logger.error('[PurchaseOrderService] 自動発注提案取得エラー', { 
+        storeId,
         error: error instanceof Error ? error.message : error 
       });
       throw error;
