@@ -89,6 +89,8 @@ export const ReceivingManagementPage: React.FC = () => {
   const [showAssignedResults, setShowAssignedResults] = useState(false);
   const [qrPrintDialog, setQrPrintDialog] = useState(false);
   const [framesForPrint, setFramesForPrint] = useState<any[]>([]);
+  const [savingIndividuals, setSavingIndividuals] = useState(false); // 個体番号保存中フラグ
+  const [assignedItemIds, setAssignedItemIds] = useState<Set<string>>(new Set()); // 既に個体番号が割り当てられた発注項目ID
 
   useEffect(() => {
     loadSuppliers();
@@ -154,10 +156,35 @@ export const ReceivingManagementPage: React.FC = () => {
         });
         setReceivingItems(itemsMap);
         setReceivingDialog(true);
+        
+        // 既存の個体番号割り当て状況を確認
+        loadExistingIndividualAssignments(response.data);
       }
     } catch (err) {
       setError('発注詳細の取得に失敗しました');
       console.error(err);
+    }
+  };
+
+  // 発注項目の既存個体番号割り当て状況をチェック
+  const loadExistingIndividualAssignments = async (_order: PurchaseOrder) => {
+    try {
+      // 注意：現在のデータ構造では発注項目と個体番号の正確な関連付けができないため、
+      // 誤った判定を避けるために既存個体番号チェック機能を一時的に無効化
+      // 実際の運用では、個体番号テーブルに purchase_order_item_id を追加するか、
+      // 別途関連付けテーブルを作成することを推奨
+      
+      // 空のSetを設定することで、全ての発注項目を「未割り当て」として表示
+      setAssignedItemIds(new Set<string>());
+      
+      // TODO: 将来的な改善案
+      // 1. framesテーブルにpurchase_order_item_idカラムを追加
+      // 2. purchase_order_item_framesテーブルを作成して関連付けを管理
+      // 3. 発注項目IDをキーとした正確な関連付けチェックを実装
+      
+    } catch (error) {
+      console.error('既存個体番号の確認中にエラーが発生しました:', error);
+      setAssignedItemIds(new Set<string>());
     }
   };
 
@@ -229,6 +256,13 @@ export const ReceivingManagementPage: React.FC = () => {
   };
 
   const handleSaveIndividualItems = async (items: any[]) => {
+    // 二重クリック防止：既に処理中の場合は処理を終了
+    if (savingIndividuals) {
+      console.warn('個体番号保存処理が既に実行中です');
+      return;
+    }
+
+    setSavingIndividuals(true);
     try {
       if (!selectedIndividualItem || !user?.store?.id) {
         throw new Error('必要な情報が不足しています');
@@ -261,11 +295,16 @@ export const ReceivingManagementPage: React.FC = () => {
       // QRコード印刷用にデータを保存
       setFramesForPrint(createdFrames || items);
       
+      // 個体番号が正常に生成されたら、この発注項目IDを既割り当て済みとしてマーク
+      setAssignedItemIds(prev => new Set(prev.add(selectedIndividualItem.id)));
+      
       setIndividualAssignmentDialog(false);
       setSelectedIndividualItem(null);
     } catch (err) {
       console.error('入庫時個体管理品登録エラー:', err);
       throw err;
+    } finally {
+      setSavingIndividuals(false);
     }
   };
 
@@ -479,16 +518,39 @@ export const ReceivingManagementPage: React.FC = () => {
                           </TableCell>
                           <TableCell align="center">
                             {item.product?.managementType === 'individual' ? (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                color="primary"
-                                startIcon={<QrCodeIcon />}
-                                onClick={() => handleOpenIndividualAssignment(item)}
-                                sx={{ minWidth: 100 }}
-                              >
-                                個体管理
-                              </Button>
+                              assignedItemIds.has(item.id) ? (
+                                // 既に個体番号が割り当てられている場合
+                                <Stack direction="column" alignItems="center" spacing={1}>
+                                  <Chip 
+                                    label="割り当て済み" 
+                                    color="success" 
+                                    size="small"
+                                    icon={<CheckCircleIcon />}
+                                  />
+                                  <Button
+                                    size="small"
+                                    variant="text"
+                                    color="secondary"
+                                    startIcon={<InfoIcon />}
+                                    onClick={() => handleOpenIndividualAssignment(item)}
+                                    sx={{ minWidth: 100 }}
+                                  >
+                                    追加割り当て
+                                  </Button>
+                                </Stack>
+                              ) : (
+                                // まだ個体番号が割り当てられていない場合
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  startIcon={<QrCodeIcon />}
+                                  onClick={() => handleOpenIndividualAssignment(item)}
+                                  sx={{ minWidth: 100 }}
+                                >
+                                  個体管理
+                                </Button>
+                              )
                             ) : (
                               <Typography variant="caption" color="textSecondary">
                                 -
@@ -520,7 +582,10 @@ export const ReceivingManagementPage: React.FC = () => {
       {/* 個体管理ダイアログ */}
       <IndividualItemAssignmentDialog
         open={individualAssignmentDialog}
-        onClose={() => setIndividualAssignmentDialog(false)}
+        onClose={() => {
+          setIndividualAssignmentDialog(false);
+          setSavingIndividuals(false); // ダイアログが閉じられた時にもフラグをリセット
+        }}
         purchaseOrderItem={selectedIndividualItem}
         onSave={handleSaveIndividualItems}
       />

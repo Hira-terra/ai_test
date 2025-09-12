@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import { PurchaseOrderItem, Frame } from '../types';
 import QRCodeScanner from './QRCodeScanner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface IndividualItem {
   id: string;
@@ -70,6 +71,7 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
   purchaseOrderItem,
   onSave
 }) => {
+  const { user } = useAuth();
   const [items, setItems] = useState<IndividualItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,14 +91,17 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
     const quantity = purchaseOrderItem.quantity || 1;
     const newItems: IndividualItem[] = [];
 
+    // 顧客付き受注（order_based）の場合は予約済み、在庫発注の場合は在庫中
+    const initialStatus = purchaseOrderItem.orderId ? 'reserved' : 'in_stock';
+
     for (let i = 0; i < quantity; i++) {
       newItems.push({
         id: '',
         serialNumber: generateSerialNumber(i + 1),
         color: '未指定',
         size: 'M',
-        status: 'in_stock',
-        location: 'メイン倉庫',
+        status: initialStatus,
+        location: user?.store?.name || 'メイン倉庫',
         tempId: `temp-${Date.now()}-${i}`
       });
     }
@@ -123,13 +128,16 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
   };
 
   const handleAddItem = () => {
+    // 顧客付き受注（order_based）の場合は予約済み、在庫発注の場合は在庫中
+    const initialStatus = purchaseOrderItem?.orderId ? 'reserved' : 'in_stock';
+
     const newItem: IndividualItem = {
       id: '',
       serialNumber: generateSerialNumber(items.length + 1),
       color: '未指定',
       size: 'M', 
-      status: 'in_stock',
-      location: 'メイン倉庫',
+      status: initialStatus,
+      location: user?.store?.name || 'メイン倉庫',
       tempId: `temp-${Date.now()}-${items.length}`
     };
     setItems(prev => [...prev, newItem]);
@@ -274,18 +282,18 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
-                <TableCell width="25%">個体番号</TableCell>
-                <TableCell width="15%">色</TableCell>
-                <TableCell width="10%">サイズ</TableCell>
-                <TableCell width="15%">ステータス</TableCell>
-                <TableCell width="20%">保管場所</TableCell>
-                <TableCell width="15%" align="center">アクション</TableCell>
+                <TableCell width="40%" sx={{ minWidth: 350 }}>個体番号</TableCell>
+                <TableCell width="12%">色</TableCell>
+                <TableCell width="8%">サイズ</TableCell>
+                <TableCell width="12%">ステータス</TableCell>
+                <TableCell width="15%">保管場所</TableCell>
+                <TableCell width="13%" align="center">アクション</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {items.map((item) => (
                 <TableRow key={item.tempId}>
-                  <TableCell>
+                  <TableCell sx={{ minWidth: 350 }}>
                     <Box display="flex" alignItems="center" gap={1}>
                       <TextField
                         size="small"
@@ -293,6 +301,12 @@ export const IndividualItemAssignmentDialog: React.FC<IndividualItemAssignmentDi
                         onChange={(e) => handleItemChange(item.tempId!, 'serialNumber', e.target.value)}
                         placeholder="個体番号"
                         fullWidth
+                        sx={{ 
+                          '& .MuiInputBase-input': { 
+                            fontSize: '0.8rem',
+                            fontFamily: 'monospace'
+                          }
+                        }}
                       />
                       <IconButton 
                         size="small" 

@@ -118,6 +118,7 @@ export class ReceivingModel {
       const itemsQuery = `
         SELECT 
           poi.id,
+          poi.order_id,
           poi.product_id,
           p.product_code,
           p.name as product_name,
@@ -133,7 +134,7 @@ export class ReceivingModel {
         INNER JOIN products p ON poi.product_id = p.id
         LEFT JOIN receiving_items ri ON poi.id = ri.purchase_order_item_id
         WHERE poi.purchase_order_id = $1
-        GROUP BY poi.id, poi.product_id, p.product_code, p.name, p.management_type,
+        GROUP BY poi.id, poi.order_id, poi.product_id, p.product_code, p.name, p.management_type,
                  poi.quantity, poi.unit_cost, poi.total_cost, 
                  poi.specifications, poi.notes
       `;
@@ -173,6 +174,7 @@ export class ReceivingModel {
 
       const transformedItems = itemsResult.rows.map((item: any) => ({
         id: item.id,
+        orderId: item.order_id,
         productId: item.product_id,
         product: {
           id: item.product_id,
