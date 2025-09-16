@@ -235,7 +235,18 @@ export const API_ENDPOINTS = {
   // 値引きマスタ管理
   DISCOUNTS: {
     BASE: '/discounts',
-    LIST: '/discounts',
+    
+    // ===== 値引きマスタ管理API =====
+    MASTER: {
+      LIST: '/discounts/master',
+      DETAIL: (id: string) => `/discounts/master/${id}`,
+      CREATE: '/discounts/master',
+      UPDATE: (id: string) => `/discounts/master/${id}`,
+      DELETE: (id: string) => `/discounts/master/${id}`,
+    },
+    
+    // ===== 受注値引きAPI（既存） =====
+    LIST: '/discounts',  // 有効な値引き一覧
     DETAIL: (id: string) => `/discounts/${id}`,
     CREATE: '/discounts',
     UPDATE: (id: string) => `/discounts/${id}`,

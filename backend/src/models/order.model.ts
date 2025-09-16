@@ -640,12 +640,42 @@ export class OrderRepository {
       order.payments = payments;
       order.discounts = discounts;
       
-      // 値引き後の金額を再計算
+      // すべての金額フィールドを確実に数値に変換
+      order.subtotalAmount = parseFloat(order.subtotalAmount.toString());
+      order.taxAmount = parseFloat(order.taxAmount.toString());
+      order.totalAmount = parseFloat(order.totalAmount.toString());
+      order.paidAmount = parseFloat(order.paidAmount.toString());
+      order.balanceAmount = parseFloat(order.balanceAmount.toString());
+      
+      console.log(`🔍 [ORDER_MODEL] Order ${order.orderNumber} before recalculation:`, {
+        subtotalAmount: order.subtotalAmount,
+        taxAmount: order.taxAmount,
+        totalAmount: order.totalAmount,
+        paidAmount: order.paidAmount,
+        balanceAmount: order.balanceAmount,
+        discountsCount: discounts ? discounts.length : 0
+      });
+      
+      // 値引き情報をログ出力（金額は上書きしない）
       if (discounts && discounts.length > 0) {
         const totalDiscountAmount = discounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
-        order.totalAmount = Math.max(0, order.subtotalAmount + order.taxAmount - totalDiscountAmount);
-        order.balanceAmount = Math.max(0, order.totalAmount - order.paidAmount);
+        
+        console.log(`🔍 [ORDER_MODEL] Order ${order.orderNumber} discount info:`, {
+          totalDiscountAmount,
+          originalTotal: order.subtotalAmount + order.taxAmount,
+          discountedTotal: Math.max(0, order.subtotalAmount + order.taxAmount - totalDiscountAmount),
+          keepingOriginalTotalAmount: order.totalAmount,
+          balanceAmount: order.balanceAmount
+        });
+        
+        // totalAmountは元の値を保持（データベースの計算カラムbalance_amountとの整合性のため）
+        // 値引き後の金額はフロントエンドで計算または別途フィールドで管理
       }
+      
+      console.log(`🔍 [ORDER_MODEL] Order ${order.orderNumber} after recalculation:`, {
+        totalAmount: order.totalAmount,
+        balanceAmount: order.balanceAmount
+      });
     }
 
     return { orders, total };
@@ -823,6 +853,8 @@ export class OrderRepository {
 
   // 受注値引き情報取得
   async findOrderDiscounts(orderId: string): Promise<any[]> {
+    console.log(`🔍 [ORDER_MODEL] findOrderDiscounts called for orderId: ${orderId}`);
+    
     const query = `
       SELECT 
         od.*,
@@ -837,7 +869,9 @@ export class OrderRepository {
     `;
 
     const result = await this.db.query(query, [orderId]);
-    return result.rows.map((row: any) => ({
+    console.log(`🔍 [ORDER_MODEL] findOrderDiscounts result: ${result.rows.length} rows for orderId: ${orderId}`);
+    
+    const discounts = result.rows.map((row: any) => ({
       id: row.id,
       orderId: row.order_id,
       discountId: row.discount_id,
@@ -852,6 +886,14 @@ export class OrderRepository {
       approvedAt: row.approved_at,
       createdAt: row.created_at
     }));
+    
+    console.log(`🔍 [ORDER_MODEL] findOrderDiscounts mapped discounts:`, discounts.map(d => ({
+      id: d.id,
+      discountName: d.discountName,
+      discountAmount: d.discountAmount
+    })));
+    
+    return discounts;
   }
 
   // 受注作成

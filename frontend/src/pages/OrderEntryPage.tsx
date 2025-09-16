@@ -431,12 +431,9 @@ const OrderEntryPage: React.FC = () => {
     return searchMatch;
   });
 
-  // 金額計算（値引き考慮）
-  const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const totalDiscountAmount = appliedDiscounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
-  const discountedSubtotal = Math.max(0, subtotal - totalDiscountAmount);
-  const taxAmount = Math.floor(discountedSubtotal * 0.1);
-  const totalAmount = discountedSubtotal + taxAmount; // 値引き後の合計金額
+  // 金額計算（統一されたロジックを使用）
+  const totals = calculateTotals();
+  const { subtotal, totalDiscountAmount, discountedSubtotal, taxAmount, finalAmount: totalAmount } = totals;
 
   // 部分支払いでない場合は入金額を合計金額（値引き後）に自動更新
   React.useEffect(() => {
@@ -1471,24 +1468,24 @@ const OrderEntryPage: React.FC = () => {
                     <Box display="flex" justifyContent="space-between" mb={1}>
                       <Typography variant="body1">小計</Typography>
                       <Typography variant="body1">
-                        ¥{calculateTotals().subtotal.toLocaleString()}
+                        ¥{subtotal.toLocaleString()}
                       </Typography>
                     </Box>
                     
-                    {calculateTotals().totalDiscountAmount > 0 && (
+                    {totalDiscountAmount > 0 && (
                       <Box display="flex" justifyContent="space-between" mb={1}>
                         <Typography variant="body1" color="error">値引き合計</Typography>
                         <Typography variant="body1" color="error">
-                          -¥{calculateTotals().totalDiscountAmount.toLocaleString()}
+                          -¥{totalDiscountAmount.toLocaleString()}
                         </Typography>
                       </Box>
                     )}
                     
-                    {calculateTotals().totalDiscountAmount > 0 && (
+                    {totalDiscountAmount > 0 && (
                       <Box display="flex" justifyContent="space-between" mb={1}>
                         <Typography variant="body1">値引き後小計</Typography>
                         <Typography variant="body1">
-                          ¥{calculateTotals().discountedSubtotal.toLocaleString()}
+                          ¥{discountedSubtotal.toLocaleString()}
                         </Typography>
                       </Box>
                     )}
@@ -1496,14 +1493,14 @@ const OrderEntryPage: React.FC = () => {
                     <Box display="flex" justifyContent="space-between" mb={1}>
                       <Typography variant="body1">消費税 (10%)</Typography>
                       <Typography variant="body1">
-                        ¥{calculateTotals().taxAmount.toLocaleString()}
+                        ¥{taxAmount.toLocaleString()}
                       </Typography>
                     </Box>
                     
                     <Box display="flex" justifyContent="space-between" sx={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
                       <Typography variant="h6">合計金額</Typography>
                       <Typography variant="h6" color="primary">
-                        ¥{calculateTotals().finalAmount.toLocaleString()}
+                        ¥{totalAmount.toLocaleString()}
                       </Typography>
                     </Box>
 

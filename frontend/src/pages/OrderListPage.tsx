@@ -231,6 +231,30 @@ const OrderListPage: React.FC = () => {
     }).format(amount);
   };
 
+  // 正しい税額を計算する関数
+  const calculateCorrectTax = (order: Order): number => {
+    const subtotal = order.subtotalAmount || 0;
+    const totalDiscountAmount = order.discounts?.reduce((sum, d) => sum + (d.discountAmount || 0), 0) || 0;
+    const discountedSubtotal = Math.max(0, subtotal - totalDiscountAmount);
+    return Math.floor(discountedSubtotal * 0.1);
+  };
+
+  // 正しい合計金額を計算する関数
+  const calculateCorrectTotal = (order: Order): number => {
+    const subtotal = order.subtotalAmount || 0;
+    const totalDiscountAmount = order.discounts?.reduce((sum, d) => sum + (d.discountAmount || 0), 0) || 0;
+    const discountedSubtotal = Math.max(0, subtotal - totalDiscountAmount);
+    const correctTax = Math.floor(discountedSubtotal * 0.1);
+    return discountedSubtotal + correctTax;
+  };
+
+  // 正しい残金を計算する関数（値引き後の最終金額 - 入金額）
+  const calculateCorrectBalance = (order: Order): number => {
+    const finalAmount = calculateCorrectTotal(order);
+    const paid = order.paidAmount || 0;
+    return Math.max(0, finalAmount - paid);
+  };
+
   // 入金追加処理
   // 処方箋入力ダイアログを開く
   const handleOpenPrescriptionDialog = (order: Order) => {
@@ -315,8 +339,8 @@ const OrderListPage: React.FC = () => {
       return;
     }
     
-    if (amount > selectedOrder.balanceAmount) {
-      setError('入金額が残金を超えています。');
+    if (amount > calculateCorrectBalance(selectedOrder)) {
+      setError('入金額が残高を超えています。');
       return;
     }
     
@@ -504,10 +528,10 @@ const OrderListPage: React.FC = () => {
                   <TableCell>顧客名</TableCell>
                   <TableCell>担当者</TableCell>
                   <TableCell>商品数</TableCell>
-                  <TableCell align="right">金額</TableCell>
+                  <TableCell align="right">小計</TableCell>
                   <TableCell align="right">値引き額</TableCell>
                   <TableCell align="right">入金額</TableCell>
-                  <TableCell align="right">残金</TableCell>
+                  <TableCell align="right">残高</TableCell>
                   <TableCell>支払方法</TableCell>
                   <TableCell>納期</TableCell>
                   <TableCell>ステータス</TableCell>
@@ -550,7 +574,7 @@ const OrderListPage: React.FC = () => {
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" fontWeight="bold">
-                        {formatCurrency(order.totalAmount)}
+                        {formatCurrency(order.subtotalAmount)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -566,10 +590,10 @@ const OrderListPage: React.FC = () => {
                     <TableCell align="right">
                       <Typography 
                         variant="body2" 
-                        color={order.balanceAmount > 0 ? 'error' : 'success'}
+                        color={calculateCorrectBalance(order) > 0 ? 'error' : 'success'}
                         fontWeight="bold"
                       >
-                        {formatCurrency(order.balanceAmount)}
+                        {formatCurrency(calculateCorrectBalance(order))}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -726,7 +750,7 @@ const OrderListPage: React.FC = () => {
               <Grid item xs={12}>
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   <Typography variant="h6" gutterBottom>金額情報</Typography>
-                  {selectedOrder.balanceAmount > 0 && (
+                  {calculateCorrectBalance(selectedOrder) > 0 && (
                     <Button
                       variant="contained"
                       size="small"
@@ -752,11 +776,11 @@ const OrderListPage: React.FC = () => {
                       ))}
                     </>
                   )}
-                  <Typography>消費税: {formatCurrency(selectedOrder.taxAmount)}</Typography>
-                  <Typography><strong>合計: {formatCurrency(selectedOrder.totalAmount)}</strong></Typography>
+                  <Typography>消費税: {formatCurrency(calculateCorrectTax(selectedOrder))}</Typography>
+                  <Typography><strong>合計: {formatCurrency(calculateCorrectTotal(selectedOrder))}</strong></Typography>
                   <Typography>入金額: {formatCurrency(selectedOrder.paidAmount)}</Typography>
-                  <Typography color={selectedOrder.balanceAmount > 0 ? 'error' : 'success'}>
-                    <strong>残金: {formatCurrency(selectedOrder.balanceAmount)}</strong>
+                  <Typography color={calculateCorrectBalance(selectedOrder) > 0 ? 'error' : 'success'}>
+                    <strong>残高: {formatCurrency(calculateCorrectBalance(selectedOrder))}</strong>
                   </Typography>
                 </Box>
               </Grid>
@@ -791,7 +815,7 @@ const OrderListPage: React.FC = () => {
                 受注番号: {selectedOrder.orderNumber}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                残金: {formatCurrency(selectedOrder.balanceAmount)}
+                残高: {formatCurrency(calculateCorrectBalance(selectedOrder))}
               </Typography>
             </Box>
           )}
@@ -807,7 +831,7 @@ const OrderListPage: React.FC = () => {
                 InputProps={{
                   startAdornment: <Typography sx={{ mr: 1 }}>¥</Typography>,
                 }}
-                helperText={selectedOrder ? `残金: ${formatCurrency(selectedOrder.balanceAmount)}` : ''}
+                helperText={selectedOrder ? `残高: ${formatCurrency(calculateCorrectBalance(selectedOrder))}` : ''}
               />
             </Grid>
             

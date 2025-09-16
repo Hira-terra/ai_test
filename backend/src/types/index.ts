@@ -486,8 +486,11 @@ export interface Discount {
   requiresManagerApproval: boolean;
   maxUsesPerCustomer?: number;
   maxUsesTotal?: number;
+  currentUses: number;
   isActive: boolean;
+  displayOrder: number;
   createdBy: UUID;
+  createdByUser?: User;
   createdAt: DateString;
   updatedAt: DateString;
 }

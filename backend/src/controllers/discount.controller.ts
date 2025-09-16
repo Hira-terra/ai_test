@@ -1,25 +1,206 @@
 import { Request, Response } from 'express';
+import { db } from '../config/database';
 import { DiscountService } from '../services/discount.service';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { UUID } from '../types';
 import { logger } from '../utils/logger';
 
+// サービスインスタンス
+// @ts-ignore - Database型とPool型の互換性問題を一時的に無視
+const discountService = new DiscountService(db);
+
 export class DiscountController {
+  
+  // ===== 値引きマスタ管理機能 =====
+
+  /**
+   * 値引き一覧取得（マスタ管理）
+   */
+  static async getAllDiscounts(req: AuthenticatedRequest, res: Response) {
+    try {
+      logger.info('[DiscountController] 値引き一覧取得開始');
+      
+      const result = await discountService.getAllDiscounts();
+      
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      
+      logger.info(`[DiscountController] 値引き一覧取得完了: ${result.data?.total || 0}件`);
+      return res.json(result);
+    } catch (error: any) {
+      logger.error('[DiscountController] 値引き一覧取得エラー:', error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '内部エラーが発生しました',
+          details: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * 値引き詳細取得（マスタ管理）
+   */
+  static async getDiscountById(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      logger.info(`[DiscountController] 値引き詳細取得開始: ${id}`);
+      
+      const result = await discountService.getDiscountById(id as UUID);
+      
+      if (!result.success) {
+        const statusCode = result.error?.code === 'DISCOUNT_NOT_FOUND' ? 404 : 500;
+        return res.status(statusCode).json(result);
+      }
+      
+      logger.info(`[DiscountController] 値引き詳細取得完了: ${id}`);
+      return res.json(result);
+    } catch (error: any) {
+      logger.error(`[DiscountController] 値引き詳細取得エラー: ${req.params.id}`, error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '内部エラーが発生しました',
+          details: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * 値引き作成（マスタ管理）
+   */
+  static async createDiscount(req: AuthenticatedRequest, res: Response) {
+    try {
+      const discountData = req.body;
+      const createdBy = req.user?.userId;
+      
+      if (!createdBy) {
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: '認証が必要です'
+          }
+        });
+      }
+      
+      logger.info('[DiscountController] 値引き作成開始', { discountCode: discountData.discountCode });
+      
+      const result = await discountService.createDiscount(discountData, createdBy);
+      
+      if (!result.success) {
+        const statusCode = result.error?.code === 'VALIDATION_ERROR' ? 400 : 500;
+        return res.status(statusCode).json(result);
+      }
+      
+      logger.info(`[DiscountController] 値引き作成完了: ${result.data?.id}`);
+      return res.status(201).json(result);
+    } catch (error: any) {
+      logger.error('[DiscountController] 値引き作成エラー:', error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '内部エラーが発生しました',
+          details: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * 値引き更新（マスタ管理）
+   */
+  static async updateDiscount(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const discountData = req.body;
+      
+      logger.info(`[DiscountController] 値引き更新開始: ${id}`);
+      
+      const result = await discountService.updateDiscount(id as UUID, discountData);
+      
+      if (!result.success) {
+        const statusCode = result.error?.code === 'DISCOUNT_NOT_FOUND' ? 404 :
+                          result.error?.code === 'VALIDATION_ERROR' ? 400 : 500;
+        return res.status(statusCode).json(result);
+      }
+      
+      logger.info(`[DiscountController] 値引き更新完了: ${id}`);
+      return res.json(result);
+    } catch (error: any) {
+      logger.error(`[DiscountController] 値引き更新エラー: ${req.params.id}`, error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '内部エラーが発生しました',
+          details: error.message
+        }
+      });
+    }
+  }
+
+  /**
+   * 値引き削除（マスタ管理）
+   */
+  static async deleteDiscount(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      
+      logger.info(`[DiscountController] 値引き削除開始: ${id}`);
+      
+      const result = await discountService.deleteDiscount(id as UUID);
+      
+      if (!result.success) {
+        const statusCode = result.error?.code === 'DISCOUNT_NOT_FOUND' ? 404 : 500;
+        return res.status(statusCode).json(result);
+      }
+      
+      logger.info(`[DiscountController] 値引き削除完了: ${id}`);
+      return res.json(result);
+    } catch (error: any) {
+      logger.error(`[DiscountController] 値引き削除エラー: ${req.params.id}`, error);
+      return res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '内部エラーが発生しました',
+          details: error.message
+        }
+      });
+    }
+  }
+
+  // ===== 受注値引き機能（既存） =====
   /**
    * 有効な値引き一覧を取得
    */
   static async getActiveDiscounts(req: AuthenticatedRequest, res: Response) {
     try {
-      const discounts = await DiscountService.getActiveDiscounts();
+      logger.info('[DiscountController] アクティブ値引き一覧取得開始');
       
+      const discounts = await discountService.getActiveDiscountsForOrder();
+      
+      logger.info(`[DiscountController] アクティブ値引き一覧取得完了: ${discounts.length}件`);
       res.json({
         success: true,
         data: discounts
       });
-    } catch (error) {
-      logger.error('Error in getActiveDiscounts controller:', error);
+    } catch (error: any) {
+      logger.error('[DiscountController] アクティブ値引き一覧取得エラー:', error);
       res.status(500).json({
         success: false,
-        error: '値引き一覧の取得に失敗しました'
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: '値引き一覧の取得に失敗しました',
+          details: error.message
+        }
       });
     }
   }
