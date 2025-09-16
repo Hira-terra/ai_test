@@ -11,7 +11,7 @@ export const receivingController = {
     const operationId = `ctrl_receiving_pending_${Date.now()}`;
     
     try {
-      const { storeId } = req.query;
+      const { storeId, supplierId, fromDate, toDate } = req.query;
       const userStoreId = req.user?.storeId;
       
       // 権限チェック: adminでない場合は自店舗のみ
@@ -21,10 +21,18 @@ export const receivingController = {
       
       logger.info(`[${operationId}] 入庫待ち発注一覧取得`, { 
         userId: req.user?.userId,
-        storeId: targetStoreId 
+        storeId: targetStoreId,
+        supplierId: supplierId as string,
+        fromDate: fromDate as string,
+        toDate: toDate as string
       });
       
-      const pendingOrders = await ReceivingService.getPendingPurchaseOrders(targetStoreId);
+      const pendingOrders = await ReceivingService.getPendingPurchaseOrders(
+        targetStoreId,
+        supplierId as string,
+        fromDate as string,
+        toDate as string
+      );
       
       res.json({
         success: true,

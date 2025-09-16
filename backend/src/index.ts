@@ -22,6 +22,7 @@ import receivingRoutes from './routes/receiving.routes';
 import frameRoutes from './routes/frame.routes';
 import supplierRoutes from './routes/supplier.routes';
 import discountRoutes from './routes/discount.routes';
+import inventoryRoutes from './routes/inventory.routes';
 
 // ミドルウェアのインポート
 import { rateLimiter } from './middleware/rateLimiter';
@@ -165,6 +166,7 @@ class Application {
     this.app.use('/api/frames', frameRoutes);
     this.app.use('/api/suppliers', supplierRoutes);
     this.app.use('/api/discounts', discountRoutes);
+    this.app.use('/api/inventory', inventoryRoutes);
 
     // ルートが見つからない場合の処理
     this.app.use('/api/*', (req, res) => {

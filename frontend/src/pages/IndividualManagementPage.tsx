@@ -105,7 +105,8 @@ export const IndividualManagementPage: React.FC = () => {
       
       // 実APIを呼び出し（管理タイプが'individual'の商品のみ）
       try {
-        const response = await fetch('/api/products?category=frame&managementType=individual', {
+        const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${API_BASE_URL}/products?category=frame&managementType=individual`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },

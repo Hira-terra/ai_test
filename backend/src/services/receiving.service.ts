@@ -13,13 +13,28 @@ export class ReceivingService {
   /**
    * 入庫待ち発注一覧を取得
    */
-  static async getPendingPurchaseOrders(storeId?: string) {
+  static async getPendingPurchaseOrders(
+    storeId?: string,
+    supplierId?: string,
+    fromDate?: string,
+    toDate?: string
+  ) {
     const operationId = `service_receiving_pending_${Date.now()}`;
     
     try {
-      logger.info(`[${operationId}] 入庫待ち発注一覧取得開始`, { storeId });
+      logger.info(`[${operationId}] 入庫待ち発注一覧取得開始`, { 
+        storeId, 
+        supplierId, 
+        fromDate, 
+        toDate 
+      });
       
-      const pendingOrders = await ReceivingModel.getPendingPurchaseOrders(storeId);
+      const pendingOrders = await ReceivingModel.getPendingPurchaseOrders(
+        storeId,
+        supplierId,
+        fromDate,
+        toDate
+      );
       
       logger.info(`[${operationId}] 入庫待ち発注一覧取得完了`, { 
         count: pendingOrders.length 

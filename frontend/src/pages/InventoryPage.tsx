@@ -40,7 +40,7 @@ import {
   Inventory as InventoryIcon,
   Assignment as AssignmentIcon,
 } from '@mui/icons-material';
-import { Frame, StockItem, Product, FrameStatus, ProductCategory } from '@/types';
+import { Frame, StockItem, FrameStatus, ProductCategory } from '@/types';
 import { inventoryService } from '@/services/inventory.service';
 
 // 定数定義
@@ -130,30 +130,34 @@ const InventoryPage: React.FC = () => {
     setError(null);
     
     try {
-      // @MOCK_TO_API: 在庫データ取得
-      const [framesResponse, stockResponse, summaryResponse] = await Promise.all([
-        inventoryService.getFrames(),
-        inventoryService.getStockItems(),
-        inventoryService.getInventorySummary()
-      ]);
-
-      if (framesResponse.success && framesResponse.data) {
-        setFrames(framesResponse.data);
-      }
+      // @MOCK_TO_API: 在庫データ取得（存在するAPIのみ）
+      console.log('Loading inventory data...');
+      
+      // 数量管理商品のみ取得（実装済み）
+      const stockResponse = await inventoryService.getStockItems();
+      console.log('Stock items response:', stockResponse);
+      
       if (stockResponse.success && stockResponse.data) {
         setStockItems(stockResponse.data);
-      }
-      if (summaryResponse.success && summaryResponse.data) {
-        const data = summaryResponse.data as any;
+        
+        // サマリー情報を更新
+        const stockData = stockResponse.data;
         setSummary({
-          totalFrames: data.totalFrames || 0,
-          availableFrames: data.inStockFrames || data.availableFrames || 0,
-          reservedFrames: data.reservedFrames || 0,
-          soldFrames: data.soldFrames || 0,
-          lowStockItems: data.lowStockItems || 0,
-          totalProducts: data.totalProducts || data.outOfStockItems || 0
+          totalFrames: 0, // フレームAPIが実装されていないため0
+          availableFrames: 0,
+          reservedFrames: 0,
+          soldFrames: 0,
+          lowStockItems: stockData.filter(item => item.currentStock <= item.minStock).length,
+          totalProducts: stockData.length
         });
+      } else if (stockResponse.error) {
+        console.error('Stock items API error:', stockResponse.error);
+        setError(stockResponse.error.message || '在庫データの取得に失敗しました。');
       }
+      
+      // TODO: フレーム在庫APIとサマリーAPIは後で実装
+      // const framesResponse = await inventoryService.getFrames();
+      // const summaryResponse = await inventoryService.getInventorySummary();
     } catch (err: any) {
       setError(err.message || 'データの読み込みに失敗しました。');
     } finally {
@@ -227,24 +231,14 @@ const InventoryPage: React.FC = () => {
     }
   };
 
-  // 在庫数量更新
+  // 在庫数量更新（簡易版）
   const updateStockQuantity = async (stockItemId: string, quantity: number) => {
     try {
-      // TODO: 実APIでupdateStockQuantityメソッドが実装されたら有効化
-      console.warn('updateStockQuantity not implemented in API yet');
-      throw new Error('在庫数量更新機能は開発中です');
-      /*
-      const response = await inventoryService.updateStockQuantity(stockItemId, quantity);
-      
-      if (response.success) {
-        await loadInventoryData(); // データ再読み込み
-        setEditDialog({ open: false, type: 'stock', item: null });
-      } else {
-        throw new Error(response.error?.message || '在庫数量更新に失敗しました。');
-      }
-      */
-    } catch (err: any) {
-      setError(err.message);
+      console.warn('在庫数量更新機能は開発中です', { stockItemId, quantity });
+      alert('在庫数量更新機能は開発中です');
+    } catch (error: any) {
+      console.error('在庫数量更新エラー:', error);
+      alert('在庫数量更新に失敗しました。');
     }
   };
 
@@ -455,7 +449,7 @@ const InventoryPage: React.FC = () => {
                       </TableCell>
                       <TableCell>{frame.location}</TableCell>
                       <TableCell>
-                        {frame.purchaseDate.split('T')[0]}
+                        {frame.purchaseDate ? frame.purchaseDate.split('T')[0] : '-'}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -586,7 +580,7 @@ const InventoryPage: React.FC = () => {
                       <TableCell align="center">{stock.minStock}</TableCell>
                       <TableCell align="center">{stock.maxStock}</TableCell>
                       <TableCell>
-                        {stock.lastUpdated.split('T')[0]}
+                        {stock.updatedAt ? stock.updatedAt.split('T')[0] : '-'}
                       </TableCell>
                       <TableCell align="center">
                         {stock.currentStock <= stock.minStock ? (

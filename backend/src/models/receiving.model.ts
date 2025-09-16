@@ -7,7 +7,12 @@ export class ReceivingModel {
   /**
    * 入庫待ち発注一覧を取得
    */
-  static async getPendingPurchaseOrders(storeId?: string) {
+  static async getPendingPurchaseOrders(
+    storeId?: string,
+    supplierId?: string,
+    fromDate?: string,
+    toDate?: string
+  ) {
     const operationId = `receiving_get_pending_${Date.now()}`;
     
     try {
@@ -40,9 +45,30 @@ export class ReceivingModel {
       `;
 
       const params: any[] = [];
+      let paramCount = 1;
+
       if (storeId) {
-        query += ` AND po.store_id = $1`;
+        query += ` AND po.store_id = $${paramCount}`;
         params.push(storeId);
+        paramCount++;
+      }
+
+      if (supplierId) {
+        query += ` AND po.supplier_id = $${paramCount}`;
+        params.push(supplierId);
+        paramCount++;
+      }
+
+      if (fromDate) {
+        query += ` AND po.order_date >= $${paramCount}`;
+        params.push(fromDate);
+        paramCount++;
+      }
+
+      if (toDate) {
+        query += ` AND po.order_date <= $${paramCount}`;
+        params.push(toDate);
+        paramCount++;
       }
 
       query += `
@@ -61,7 +87,12 @@ export class ReceivingModel {
         ORDER BY po.expected_delivery_date ASC
       `;
 
-      logger.info(`[${operationId}] 入庫待ち発注一覧取得`, { storeId });
+      logger.info(`[${operationId}] 入庫待ち発注一覧取得`, { 
+        storeId, 
+        supplierId, 
+        fromDate, 
+        toDate 
+      });
       const result = await db.query(query, params);
       
       // スネークケースからキャメルケースへ変換
@@ -256,7 +287,7 @@ export class ReceivingModel {
       const receivingResult = await client.query(receivingQuery, receivingValues);
       const receiving = receivingResult.rows[0];
       
-      // 入庫明細作成
+      // 入庫明細作成と在庫更新
       const receivingItems = [];
       for (const item of data.items) {
         if (item.receivedQuantity > 0) {
@@ -294,6 +325,9 @@ export class ReceivingModel {
           
           const itemResult = await client.query(itemQuery, itemValues);
           receivingItems.push(itemResult.rows[0]);
+
+          // 数量管理商品の場合、在庫テーブルを更新
+          await this.updateStockLevels(client, item.purchaseOrderItemId, item.receivedQuantity);
         }
       }
       
@@ -695,6 +729,65 @@ export class ReceivingModel {
     } catch (error: any) {
       logger.error(`[${operationId}] 入庫済み発注一覧取得エラー`, error);
       throw new DatabaseError('入庫済み発注一覧の取得に失敗しました');
+    }
+  }
+
+  /**
+   * 在庫レベル更新（数量管理商品用）
+   */
+  private static async updateStockLevels(client: any, purchaseOrderItemId: string, receivedQuantity: number) {
+    const operationId = `receiving_update_stock_${Date.now()}`;
+    
+    try {
+      // 発注明細から商品情報と店舗情報を取得
+      const getProductInfoQuery = `
+        SELECT 
+          poi.product_id,
+          p.management_type,
+          po.store_id
+        FROM purchase_order_items poi
+        INNER JOIN products p ON poi.product_id = p.id
+        INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+        WHERE poi.id = $1
+      `;
+      
+      const productInfoResult = await client.query(getProductInfoQuery, [purchaseOrderItemId]);
+      
+      if (productInfoResult.rows.length === 0) {
+        logger.warn(`[${operationId}] 発注明細が見つかりません: ${purchaseOrderItemId}`);
+        return;
+      }
+      
+      const { product_id, management_type, store_id } = productInfoResult.rows[0];
+      
+      // 数量管理商品の場合のみ在庫更新
+      if (management_type === 'quantity') {
+        // 既存の在庫レコードを確認・更新またはINSERT
+        const updateStockQuery = `
+          INSERT INTO stock_levels (product_id, store_id, current_quantity, safety_stock, max_stock)
+          VALUES ($1, $2, $3, 0, 100)
+          ON CONFLICT (product_id, store_id)
+          DO UPDATE SET 
+            current_quantity = stock_levels.current_quantity + $3,
+            updated_at = CURRENT_TIMESTAMP
+          RETURNING id, current_quantity
+        `;
+        
+        const stockResult = await client.query(updateStockQuery, [product_id, store_id, receivedQuantity]);
+        
+        logger.info(`[${operationId}] 在庫更新完了`, {
+          productId: product_id,
+          storeId: store_id,
+          receivedQuantity,
+          newQuantity: stockResult.rows[0].current_quantity
+        });
+      } else if (management_type === 'individual') {
+        // 個体管理商品の場合は個体テーブル（frames）に追加する処理は別途実装
+        logger.info(`[${operationId}] 個体管理商品は個体テーブルで管理: ${product_id}`);
+      }
+    } catch (error: any) {
+      logger.error(`[${operationId}] 在庫レベル更新エラー`, error);
+      throw new DatabaseError('在庫レベルの更新に失敗しました');
     }
   }
 }

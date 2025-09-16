@@ -966,7 +966,8 @@ export interface StockItem {
   currentStock: number;
   minStock: number;
   maxStock?: number;
-  lastUpdated: DateString;
+  updatedAt: DateString;
+  createdAt: DateString;
 }
 
 // =================================================================
