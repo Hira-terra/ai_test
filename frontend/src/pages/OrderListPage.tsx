@@ -119,7 +119,7 @@ const OrderListPage: React.FC = () => {
     setError(null);
     
     try {
-      // @MOCK_TO_API: 受注一覧取得
+      // 受注一覧取得
       const response = await orderService.getOrders({
         page: pagination.page,
         limit: pagination.limit,
@@ -175,7 +175,7 @@ const OrderListPage: React.FC = () => {
 
   const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
     try {
-      // @MOCK_TO_API: 受注ステータス更新
+      // 受注ステータス更新
       const response = await orderService.updateOrder(orderId, { status });
       
       if (response.success) {
@@ -387,7 +387,6 @@ const OrderListPage: React.FC = () => {
 
   return (
     <Box>
-      {/* @MOCK_UI: モック使用バナー */}
       
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">

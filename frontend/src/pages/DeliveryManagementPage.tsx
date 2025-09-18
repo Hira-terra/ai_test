@@ -130,102 +130,12 @@ export const DeliveryManagementPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // モックデータ（実APIが完成後に置き換え）
-      const mockData: DeliveryOrder[] = [
-        {
-          id: '1',
-          orderId: 'order-1',
-          deliveryNumber: 'DEL-001',
-          status: 'ready',
-          scheduledDate: '2025-09-12T10:00:00Z',
-          deliveredBy: 'user-1',
-          deliveredByName: '田中スタッフ',
-          customerNotified: true,
-          deliveryMethod: 'store_pickup',
-          notes: '度数確認が重要です',
-          qualityCheckPassed: true,
-          finalAmount: 45000,
-          paidAmount: 20000,
-          balanceAmount: 25000,
-          paymentStatus: 'partial',
-          paymentMethod: 'cash',
-          receiptIssued: false,
-          warrantyPeriod: 12,
-          createdAt: '2025-09-10T09:00:00Z',
-          updatedAt: '2025-09-10T15:00:00Z',
-          order: {
-            id: 'order-1',
-            orderNumber: 'ORD-2025-001',
-            customer: {
-              id: 'cust-1',
-              customerNumber: 'C-000001',
-              lastName: '山田',
-              firstName: '太郎',
-              lastNameKana: 'やまだ',
-              firstNameKana: 'たろう',
-              phone: '03-1234-5678',
-              email: 'yamada@example.com',
-              birthDate: '1980-01-01',
-              gender: 'male',
-              address: {
-                zipCode: '160-0001',
-                prefecture: '東京都',
-                city: '新宿区',
-                address1: '西新宿1-1-1',
-                address2: 'マンション101'
-              },
-              createdAt: '2025-01-01T00:00:00Z',
-              updatedAt: '2025-01-01T00:00:00Z'
-            }
-          } as any
-        },
-        {
-          id: '2',
-          orderId: 'order-2',
-          deliveryNumber: 'DEL-002',
-          status: 'scheduled',
-          scheduledDate: '2025-09-13T14:00:00Z',
-          customerNotified: true,
-          deliveryMethod: 'store_pickup',
-          qualityCheckPassed: true,
-          finalAmount: 32000,
-          paidAmount: 0,
-          balanceAmount: 32000,
-          paymentStatus: 'unpaid',
-          receiptIssued: false,
-          warrantyPeriod: 12,
-          createdAt: '2025-09-09T10:00:00Z',
-          updatedAt: '2025-09-10T14:00:00Z',
-          order: {
-            id: 'order-2',
-            orderNumber: 'ORD-2025-002',
-            customer: {
-              id: 'cust-2',
-              customerNumber: 'C-000002',
-              lastName: '佐藤',
-              firstName: '花子',
-              lastNameKana: 'さとう',
-              firstNameKana: 'はなこ',
-              phone: '03-2345-6789',
-              email: 'sato@example.com',
-              birthDate: '1985-05-15',
-              gender: 'female',
-              address: {
-                zipCode: '150-0001',
-                prefecture: '東京都',
-                city: '渋谷区',
-                address1: '渋谷1-1-1',
-                address2: 'ビル501'
-              },
-              createdAt: '2025-01-02T00:00:00Z',
-              updatedAt: '2025-01-02T00:00:00Z'
-            }
-          } as any
-        }
-      ];
-
+      // TODO: 実API実装待ち
+      // 現在はデータが空の状態
+      const deliveryOrders: DeliveryOrder[] = [];
+      
       // フィルタリング処理
-      let filteredData = mockData;
+      let filteredData = deliveryOrders;
       if (filters.status) {
         filteredData = filteredData.filter(order => order.status === filters.status);
       }

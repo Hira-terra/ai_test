@@ -130,7 +130,7 @@ const InventoryPage: React.FC = () => {
     setError(null);
     
     try {
-      // @MOCK_TO_API: 在庫データ取得（存在するAPIのみ）
+      // 在庫データ取得
       console.log('Loading inventory data...');
       
       // 数量管理商品のみ取得（実装済み）
@@ -169,7 +169,7 @@ const InventoryPage: React.FC = () => {
   const searchFrames = async () => {
     setLoading(true);
     try {
-      // @MOCK_TO_API: フレーム検索
+      // フレーム検索
       const response = await inventoryService.getFrames({
         search: frameSearch,
         status: frameStatusFilter || undefined
@@ -189,7 +189,7 @@ const InventoryPage: React.FC = () => {
   const searchStock = async () => {
     setLoading(true);
     try {
-      // @MOCK_TO_API: 在庫検索
+      // 在庫検索
       const response = await inventoryService.getStockItems({
         lowStock: showLowStockOnly
       });
@@ -197,7 +197,7 @@ const InventoryPage: React.FC = () => {
       if (response.success && response.data) {
         let filteredStock = response.data;
         
-        // @MOCK_LOGIC: 商品名での絞り込み
+        // 商品名での絞り込み
         if (stockSearch) {
           filteredStock = filteredStock.filter(stock =>
             stock.product?.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
@@ -217,7 +217,7 @@ const InventoryPage: React.FC = () => {
   // フレームステータス更新
   const updateFrameStatus = async (serialNumber: string, status: FrameStatus) => {
     try {
-      // @MOCK_TO_API: フレームステータス更新
+      // フレームステータス更新
       const response = await inventoryService.updateFrameStatus(serialNumber, status);
       
       if (response.success) {
@@ -256,7 +256,6 @@ const InventoryPage: React.FC = () => {
 
   return (
     <Box>
-      {/* @MOCK_UI: モック使用バナー */}
 
       <Typography variant="h5" gutterBottom fontWeight="bold">
         在庫管理

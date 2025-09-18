@@ -318,7 +318,7 @@ const OrderEntryPage: React.FC = () => {
           console.warn('値引きマスタの取得に失敗しました:', discountResponse.error);
           setAvailableDiscounts([]);
         }
-        // @MOCK_TO_API: 顧客情報取得
+        // 顧客情報取得
         if (customerId) {
           const customerResponse = await customerService.getCustomerById(customerId);
           if (customerResponse.success && customerResponse.data) {
@@ -453,7 +453,7 @@ const OrderEntryPage: React.FC = () => {
     setError(null);
 
     try {
-      // @MOCK_TO_API: 顧客検索（全店舗対象）
+      // 顧客検索（全店舗対象）
       const response = await customerService.searchCustomers({
         search: customerSearchQuery,
         page: 1,
@@ -702,7 +702,6 @@ const OrderEntryPage: React.FC = () => {
 
   return (
     <Box>
-      {/* @MOCK_UI: モック使用バナー */}
 
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5" fontWeight="bold">

@@ -115,95 +115,12 @@ export const ProductionManagementPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      // モックデータ（実APIが完成後に置き換え）
-      const mockData: ProductionOrder[] = [
-        {
-          id: '1',
-          orderId: 'order-1',
-          productionNumber: 'PROD-001',
-          status: 'lens_processing',
-          currentStep: 'lens_grinding',
-          priority: 'high',
-          startedAt: '2025-09-09T09:00:00Z',
-          expectedCompletionDate: '2025-09-12T17:00:00Z',
-          assignedTechnician: 'tech-1',
-          assignedTechnicianName: '田中 技師',
-          notes: '急ぎのオーダーです',
-          qualityCheckResult: 'pending',
-          steps: ['lens_cutting', 'lens_grinding', 'lens_coating'],
-          createdAt: '2025-09-09T08:00:00Z',
-          updatedAt: '2025-09-10T10:00:00Z',
-          order: {
-            id: 'order-1',
-            orderNumber: 'ORD-2025-001',
-            customer: {
-              id: 'cust-1',
-              customerNumber: 'C-000001',
-              lastName: '山田',
-              firstName: '太郎',
-              lastNameKana: 'やまだ',
-              firstNameKana: 'たろう',
-              phone: '03-1234-5678',
-              email: 'yamada@example.com',
-              birthDate: '1980-01-01',
-              gender: 'male',
-              address: {
-                zipCode: '160-0001',
-                prefecture: '東京都',
-                city: '新宿区',
-                address1: '西新宿1-1-1',
-                address2: 'マンション101'
-              },
-              createdAt: '2025-01-01T00:00:00Z',
-              updatedAt: '2025-01-01T00:00:00Z'
-            }
-          } as any
-        },
-        {
-          id: '2',
-          orderId: 'order-2',
-          productionNumber: 'PROD-002',
-          status: 'quality_check',
-          currentStep: 'final_check',
-          priority: 'normal',
-          startedAt: '2025-09-08T14:00:00Z',
-          expectedCompletionDate: '2025-09-11T17:00:00Z',
-          assignedTechnician: 'tech-2',
-          assignedTechnicianName: '佐藤 職人',
-          qualityCheckResult: 'pending',
-          steps: productionSteps,
-          createdAt: '2025-09-08T13:00:00Z',
-          updatedAt: '2025-09-10T11:00:00Z',
-          order: {
-            id: 'order-2',
-            orderNumber: 'ORD-2025-002',
-            customer: {
-              id: 'cust-2',
-              customerNumber: 'C-000002',
-              lastName: '佐藤',
-              firstName: '花子',
-              lastNameKana: 'さとう',
-              firstNameKana: 'はなこ',
-              phone: '03-2345-6789',
-              email: 'sato@example.com',
-              birthDate: '1985-05-15',
-              gender: 'female',
-              address: {
-                zipCode: '150-0001',
-                prefecture: '東京都',
-                city: '渋谷区',
-                address1: '渋谷1-1-1',
-                address2: 'ビル501'
-              },
-              createdAt: '2025-01-02T00:00:00Z',
-              updatedAt: '2025-01-02T00:00:00Z'
-            }
-          } as any
-        }
-      ];
-
+      // TODO: 実API実装待ち
+      // 現在はデータが空の状態
+      const productionOrders: ProductionOrder[] = [];
+      
       // フィルタリング処理
-      let filteredData = mockData;
+      let filteredData = productionOrders;
       if (filters.status) {
         filteredData = filteredData.filter(order => order.status === filters.status);
       }

@@ -52,12 +52,20 @@ const LoginPage: React.FC = () => {
   useEffect(() => {
     const loadStores = async () => {
       console.log('🏪 店舗一覧の取得を開始');
+      console.log('🌐 API_BASE_URL:', process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api');
       try {
         const stores = await storeService.getAllStores();
         console.log('✅ 店舗一覧取得成功:', stores);
+        console.log('📊 取得した店舗数:', stores.length);
         setStores(stores);
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ 店舗一覧の取得に失敗しました:', error);
+        console.error('📍 エラーの詳細:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        setError(`店舗一覧の取得に失敗しました: ${error.message}`);
       } finally {
         console.log('🏁 店舗一覧取得処理終了');
         setLoadingStores(false);

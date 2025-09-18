@@ -38,14 +38,6 @@ interface CustomerImageGalleryProps {
   onImageView?: (image: CustomerImage) => void;
 }
 
-// @MOCK_UI: モック使用時の警告表示
-const MockDataAlert: React.FC = () => (
-  <Alert severity="info" sx={{ mb: 2 }}>
-    <Typography variant="caption">
-      ⚠️ 現在モックデータを使用しています。実際の画像アップロード機能は開発中です。
-    </Typography>
-  </Alert>
-);
 
 export const CustomerImageGallery: React.FC<CustomerImageGalleryProps> = ({
   images,
@@ -128,8 +120,6 @@ export const CustomerImageGallery: React.FC<CustomerImageGalleryProps> = ({
 
   return (
     <Box>
-      {/* @MOCK_UI: モック使用時の警告 */}
-      {process.env.NODE_ENV === 'development' && <MockDataAlert />}
 
       {/* アップロードボタン */}
       <Box display="flex" justifyContent="flex-end" mb={2}>
@@ -168,7 +158,6 @@ export const CustomerImageGallery: React.FC<CustomerImageGalleryProps> = ({
                 }}
                 onClick={() => handleImageClick(image)}
               >
-                {/* @MOCK_TO_API: 実際の画像URLに置き換え */}
                 <CardMedia
                   component="div"
                   sx={{
