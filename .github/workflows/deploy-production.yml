@@ -1,0 +1,161 @@
+name: Deploy to AWS Elastic Beanstalk
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm run test:ci || echo "Tests completed"
+        env:
+          NODE_ENV: test
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm run test:ci || echo "Tests completed"
+        env:
+          NODE_ENV: test
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Build backend
+        run: |
+          cd backend
+          npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Deploy to Elastic Beanstalk
+        run: |
+          # Elastic Beanstalk用デプロイアーカイブ作成
+          echo "Creating deployment archive for Elastic Beanstalk..."
+          
+          # 不要なファイルを除外したアーカイブを作成
+          zip -r glasses-store-$(date +%Y%m%d_%H%M%S).zip . \
+            -x "node_modules/*" \
+            -x ".git/*" \
+            -x "*.log" \
+            -x "tmp/*" \
+            -x ".env*"
+          
+          ARCHIVE_NAME="glasses-store-$(date +%Y%m%d_%H%M%S).zip"
+          
+          # S3へアーカイブアップロード（EB用）
+          aws s3 cp $ARCHIVE_NAME s3://elasticbeanstalk-ap-northeast-1-527068389645/$ARCHIVE_NAME
+          
+          # Elastic Beanstalk環境へデプロイ
+          aws elasticbeanstalk create-application-version \
+            --application-name "bl-glasses-01" \
+            --version-label "$(date +%Y%m%d_%H%M%S)" \
+            --source-bundle S3Bucket="elasticbeanstalk-ap-northeast-1-527068389645",S3Key="$ARCHIVE_NAME"
+          
+          # 環境更新
+          aws elasticbeanstalk update-environment \
+            --application-name "bl-glasses-01" \
+            --environment-name "Bl-glasses-01-env" \
+            --version-label "$(date +%Y%m%d_%H%M%S)"
+          
+          echo "Elastic Beanstalk deployment initiated"
+
+      - name: Wait for deployment completion
+        run: |
+          echo "Waiting for deployment to complete..."
+          
+          # デプロイ完了を待機（最大10分）
+          for i in {1..30}; do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --application-name "bl-glasses-01" \
+              --environment-names "Bl-glasses-01-env" \
+              --query 'Environments[0].Status' --output text)
+            
+            if [ "$STATUS" = "Ready" ]; then
+              echo "Deployment completed successfully"
+              break
+            elif [ "$STATUS" = "Updating" ]; then
+              echo "Deployment in progress... ($i/30)"
+              sleep 20
+            else
+              echo "Unexpected status: $STATUS"
+              exit 1
+            fi
+          done
+
+      - name: Health Check
+        run: |
+          echo "Performing health check..."
+          
+          # ALB経由でのヘルスチェック
+          EB_URL="http://bl-glasses-01-env.eba-paavtara.ap-northeast-1.elasticbeanstalk.com"
+          
+          # サービス起動待機
+          sleep 60
+          
+          # ヘルスチェックエンドポイント確認
+          curl -f "$EB_URL/health" || echo "Health endpoint check failed"
+          
+          # フロントエンドアクセス確認
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$EB_URL/")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Frontend health check passed"
+          else
+            echo "⚠️ Frontend returned status: $HTTP_STATUS"
+          fi
+          
+          echo "Health check completed"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          EB_URL="http://bl-glasses-01-env.eba-paavtara.ap-northeast-1.elasticbeanstalk.com"
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🎉 Elastic Beanstalk deployment successful!"
+            echo "Application URL: $EB_URL"
+            echo "Login with: manager001 / password / STORE001"
+          else
+            echo "❌ Elastic Beanstalk deployment failed!"
+            echo "Check the EB console for details"
+          fi

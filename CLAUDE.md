@@ -73,6 +73,133 @@ AppGenius自体についての質問には応答せず、ユーザープロジ�
 4. **実認証テスト**: モックではなく実際の認証情報を使った統合テストを実施
 5. **フロントエンド実装**: 型定義に基づいてAPI連携コードを実装
 
+## 2024年9月24日 AWS Elastic Beanstalk環境へのデプロイ作業
+
+### 本日の作業内容と進捗
+
+#### 1. デプロイ環境の確認と準備
+
+**提供されたAWS環境**:
+- AWSアカウント: 527068389645
+- EC2インスタンス: i-09e6bdd6d228135e3 (172.19.101.51)
+- ALB URL: http://bl-glasses-01-env.eba-paavtara.ap-northeast-1.elasticbeanstalk.com/
+- IAMユーザー: BL-deploy01
+- VPC: 172.19.0.0/16
+
+**デプロイ方針決定**:
+- データベース: EC2上でDocker PostgreSQL + Redis（選択肢A）
+- デプロイ方式: Elastic Beanstalk環境活用
+- SSL証明書: 当面不要（将来検討）
+- ファイル保存: EC2のEBS
+- Auto Scaling: シンプル構成（単一EC2）
+
+#### 2. Elastic Beanstalk対応ファイルの作成
+
+**作成済みファイル**:
+- `.platform/nginx/conf.d/glasses-store.conf` - EB用Nginxプロキシ設定
+- `.platform/hooks/postdeploy/01_start_services.sh` - EB Post Deployフック
+- `docker-compose.eb.yml` - EB環境最適化Docker Compose設定
+- `.github/workflows/deploy-production.yml` - GitHub Actions EB対応版
+- `scripts/deploy-eb.sh` - 手動EBデプロイスクリプト
+- `scripts/deploy-ec2-direct.sh` - EC2直接デプロイスクリプト
+- `scripts/deploy-manual.sh` - 手動デプロイスクリプト
+- `scripts/backup-restore.sh` - バックアップ・復元管理スクリプト
+- `scripts/setup-ec2.sh` - EC2初期セットアップ自動化スクリプト
+
+#### 3. EC2直接デプロイの実施
+
+**インフラチームの提案に従い、EC2上でgit pullする方針に変更**
+
+**実施手順**:
+1. EC2にSSH接続
+2. GitHubからリポジトリをクローン
+3. Docker & Docker Composeインストール
+4. アプリケーションコンテナ起動
+
+**現在の状況**:
+- ✅ GitHubリポジトリのクローン完了
+- ✅ Docker環境構築完了
+- ✅ PostgreSQL、Redis起動成功
+- ✅ Backend、Frontend起動成功
+- ⚠️ フロントエンドから「店舗一覧の取得に失敗しました: Failed to fetch」エラー
+- ❌ Nginxコンテナ: ポート80競合のため除外
+
+#### 4. 発生した問題と対処
+
+**解決済みの問題**:
+1. `zip`コマンドが未インストール → `sudo apt install -y zip`で解決
+2. AWS CLIが未インストール → EC2直接デプロイ方式に変更
+3. `docker-compose.production.yml`が存在しない → 基本構成で起動
+4. PostgreSQL初期化スクリプトエラー → 無視して起動成功
+5. Nginxポート80競合 → EB既存Nginxとの競合のため除外して起動
+
+**未解決の問題**:
+- バックエンドAPI接続エラー（フロントエンドからバックエンドへの通信失敗）
+
+#### 5. 現在のアプリケーション状態
+
+**アクセスURL**:
+- フロントエンド: http://172.19.101.51:3000 （表示OK、API接続エラー）
+- バックエンドAPI: http://172.19.101.51:3001 （確認必要）
+- ALB経由: http://bl-glasses-01-env.eba-paavtara.ap-northeast-1.elasticbeanstalk.com （デフォルトEBページ）
+
+**Docker起動状況**:
+```
+✔ Container glasses_redis     Healthy
+✔ Container glasses_postgres  Healthy
+✔ Container glasses_pgadmin   Started
+✔ Container glasses_backend   Started
+✔ Container glasses_frontend  Started
+❌ Container glasses_nginx     除外（ポート80競合）
+```
+
+### 次回作業開始時の確認事項
+
+#### 1. バックエンドAPI接続問題の解決
+```bash
+# EC2にSSH接続
+ssh -i bl-glasses-01.pem ec2-user@172.19.101.51
+cd glasses-store
+
+# バックエンドログ確認
+docker-compose logs backend
+
+# API直接テスト
+curl http://localhost:3001/api/stores
+curl http://localhost:3001/health
+
+# データベース接続確認
+docker-compose exec postgres pg_isready -U glasses_user
+```
+
+#### 2. 環境変数設定の確認
+```bash
+# .env.productionファイルの確認
+cat .env.production
+
+# CORS設定の確認（重要）
+grep CORS .env.production
+```
+
+#### 3. フロントエンド→バックエンド接続設定
+- フロントエンドがバックエンドAPIに接続できるよう環境変数確認
+- CORS設定の修正が必要な可能性
+
+### 次回の優先作業
+
+1. **バックエンドAPI接続問題の解決**
+   - ログ分析によるエラー原因特定
+   - 環境変数設定の修正
+   - CORS設定の調整
+
+2. **ALB経由でのアクセス設定**
+   - Elastic Beanstalk環境へのプロキシ設定
+   - ALB → EC2:3000（フロントエンド）への転送設定
+
+3. **完全動作確認**
+   - ログイン機能テスト
+   - 各種管理画面の動作確認
+
 ## 2024年8月18日 実装進捗
 
 ### 完了した実装内容

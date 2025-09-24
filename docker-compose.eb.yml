@@ -1,0 +1,187 @@
+# Elastic Beanstalk用 Docker Compose設定
+# 眼鏡店管理システム
+
+services:
+  # PostgreSQL - EB環境最適化
+  postgres:
+    image: postgres:15-alpine
+    container_name: glasses_postgres_eb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-glasses_store_db}
+      POSTGRES_USER: ${POSTGRES_USER:-glasses_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+      - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+      - ./backups/postgres:/backups
+    ports:
+      - "5432:5432"
+    networks:
+      - glasses_network
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=100
+      -c shared_buffers=128MB
+      -c effective_cache_size=512MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c random_page_cost=1.1
+      -c log_min_duration_statement=1000
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-glasses_user} -d ${POSTGRES_DB:-glasses_store_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - EB環境最適化
+  redis:
+    image: redis:7-alpine
+    container_name: glasses_redis_eb
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+      - ./backups/redis:/backups
+    ports:
+      - "6379:6379"
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--pass", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # バックエンド - EB本番設定
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: glasses_backend_eb
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-glasses_store_db}
+      DB_USER: ${POSTGRES_USER:-glasses_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      UPLOAD_DIR: /app/uploads
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs/app:/app/logs
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # フロントエンド - EB本番設定
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        REACT_APP_API_BASE_URL: ${CORS_ORIGIN}/api
+        REACT_APP_WS_URL: ${CORS_ORIGIN_WS}
+        REACT_APP_USE_MOCK_API: "false"
+    container_name: glasses_frontend_eb
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REACT_APP_API_BASE_URL: ${CORS_ORIGIN}/api
+      REACT_APP_WS_URL: ${CORS_ORIGIN_WS}
+      REACT_APP_USE_MOCK_API: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - glasses_network
+
+  # pgAdmin - EB環境用（オプション）
+  pgadmin:
+    image: dpage/pgladmin4:8.0
+    container_name: glasses_pgladmin_eb
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGLADMIN_EMAIL:-admin@glasses-store.com}
+      PGLADMIN_DEFAULT_PASSWORD: ${PGLADMIN_PASSWORD}
+      PGLADMIN_CONFIG_SERVER_MODE: 'True'
+      PGLADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'True'
+      PGLADMIN_LISTEN_ADDRESS: '0.0.0.0'
+      PGLADMIN_LISTEN_PORT: 80
+    volumes:
+      - pgladmin_data:/var/lib/pgladmin
+      - ./pgladmin/servers.json:/pgladmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - glasses_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# EB用ネットワーク設定
+networks:
+  glasses_network:
+    driver: bridge
+    name: glasses_network_eb
+
+# EB用ボリューム設定（EBS永続化）
+volumes:
+  postgres_data:
+    driver: local
+    name: glasses_store_eb_postgres_data
+  
+  redis_data:
+    driver: local
+    name: glasses_store_eb_redis_data
+  
+  pgladmin_data:
+    driver: local
+    name: glasses_store_eb_pgladmin_data
