@@ -26,6 +26,7 @@ import { IndividualManagementPage } from '@/pages/IndividualManagementPage';
 import { SupplierManagementPage } from '@/pages/SupplierManagementPage';
 import { ProductionManagementPage } from '@/pages/ProductionManagementPage';
 import DiscountManagementPage from '@/pages/DiscountManagementPage';
+import DiscountMasterPage from '@/pages/DiscountMasterPage';
 
 const App: React.FC = () => {
   return (
@@ -63,6 +64,7 @@ const App: React.FC = () => {
               <Route path="suppliers" element={<SupplierManagementPage />} />
               <Route path="users" element={<UserMasterPage />} />
               <Route path="discounts" element={<DiscountManagementPage />} />
+              <Route path="discount-master" element={<DiscountMasterPage />} />
             </Route>
             
             <Route path="*" element={<Navigate to="/" replace />} />

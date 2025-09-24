@@ -159,7 +159,7 @@ const menuGroups: MenuGroup[] = [
         requiredPermissions: ['manager', 'admin'],
       },
       {
-        path: '/discounts',
+        path: '/discount-master',
         label: '値引きマスタ',
         icon: DiscountIcon,
         requiredPermissions: ['manager', 'admin'],
