@@ -17,8 +17,8 @@
 2. IAM情報
 
 ・ User：BL-deploy01  
-・ アクセスキー：[YOUR_ACCESS_KEY_ID]  
-・ シークレットキー：[YOUR_SECRET_ACCESS_KEY]  
+・ アクセスキー：[MASKED - インフラチームから提供]
+・ シークレットキー：[MASKED - インフラチームから提供]  
 
 3. ネットワーク構成
 
@@ -31,9 +31,9 @@
 
 4. コンピューティング環境(EC2)
 
-・ インスタンスID：i-09e6bdd6d228135e3 
+・ インスタンスID：i-065d5b574c30d9c67 
 ・ インスタンス名：Bl-glasses-01-env
-・ インスタンスIP：172.19.101.51
+・ インスタンスIP：172.19.101.201
 ・ VPCID：vpc-0d9e0881a77d26ab0  
 ・ ALB-DNS：http://bl-glasses-01-env.eba-paavtara.ap-northeast-1.elasticbeanstalk.com/
 ・ Auto Scaling グループ名：awseb-e-y3vyktafu4-stack-AWSEBAutoScalingGroup-PpI0NIM9r69J  
