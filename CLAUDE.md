@@ -3081,5 +3081,474 @@ ssh -i bl-glasses-01.pem ec2-user@172.19.101.51 "echo 'EC2接続確認'"  # VPN�
 - **データ永続化**: EBSボリューム使用
 - **ネットワーク**: プライベートサブネット内でのコンテナ間通信
 
-### まとめ
+---
+
+## 2025年9月30日 EC2環境の完全セットアップ完了
+
+### 作業概要
+インフラチームによるEC2スペック増強後、ローカル環境と完全に同一の状態でEC2環境のセットアップを完了しました。
+
+### 実施した作業内容
+
+#### 1. 環境確認と初期設定
+**新EC2環境**:
+- IPアドレス: 172.19.101.201（作り直し後）
+- SSH接続: 正常確認
+- Docker環境: Docker 25.0.8, Compose v2.39.3
+- VPN経由でのアクセス: 正常
+
+**基本フロー確立**:
+- ローカルPC → Git → EC2 のデプロイフローを確立
+- Gitを真実の源とし、直接ファイル転送は一時的な対応のみに限定
+
+#### 2. Docker環境のセットアップ
+
+**実施手順**:
+1. GitHubからリポジトリをclone: `git clone https://github.com/Hira-terra/ai_test.git test_kokyaku`
+2. ローカルの`.env`ファイルをEC2に転送（環境変数設定）
+3. 必要なディレクトリ構造を作成:
+   - `logs/app`, `logs/nginx`
+   - `uploads`
+   - `backups`
+   - `certs`
+   - `data`
+4. ポート80競合解決: ホストのnginxサービス停止
+5. Docker Compose起動: 全6コンテナ起動成功
+
+#### 3. データベース初期化の課題と解決
+
+**発見した問題**:
+- schema.sqlに16テーブル定義のみ
+- ローカルDBには27テーブル存在
+- 差分11テーブルが不足
+- storesテーブルに`is_active`カラムが不足
+
+**解決策**:
+1. PostgreSQLスキーマをクリーンアップ: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`
+2. ローカルからschema.sql実行
+3. 不足テーブル定義をローカルDBからエクスポート:
+   ```bash
+   pg_dump --schema-only -t discounts -t suppliers ... > missing_tables.sql
+   ```
+4. EC2で不足テーブルを作成
+5. `is_active`カラム追加: `ALTER TABLE stores ADD COLUMN is_active boolean NOT NULL DEFAULT true;`
+6. seed.sqlでテストデータ投入
+7. usersテーブルデータをローカルからエクスポート・投入
+
+**最終結果**:
+- ✅ テーブル数: 27テーブル（ローカルと完全一致）
+- ✅ ユーザーデータ: 4ユーザー投入成功
+- ✅ 店舗データ: 6店舗投入成功
+
+#### 4. API動作確認
+
+**テスト結果**:
+- ✅ ヘルスチェック: `GET /health` - データベース・Redis正常
+- ✅ 店舗API: `GET /api/stores` - 6店舗取得成功
+- ✅ 認証API: `POST /api/auth/login` - manager001で認証成功
+  - userCode: manager001
+  - password: password
+  - storeCode: STORE001
+
+#### 5. 最終システム状態
+
+**全コンテナ状態 (healthy)**:
+```
+NAME               STATUS
+glasses_backend    Up (healthy)
+glasses_frontend   Up (healthy)
+glasses_nginx      Up (healthy)
+glasses_pgadmin    Up (healthy)
+glasses_postgres   Up (healthy)
+glasses_redis      Up (healthy)
+```
+
+**データベース構成**:
+- テーブル数: 27
+- テストユーザー: 4名
+- テスト店舗: 6店舗
+- ローカル環境と完全同期
+
+### 技術的な学び
+
+#### 1. Gitでのファイル管理の問題
+- **問題**: `backend/database/init.sql`, `schema.sql`, `seed.sql`がGit上でディレクトリとして認識されていた
+- **原因**: Gitの履歴で一度ディレクトリとして扱われた可能性
+- **対処**: ローカルから直接ファイル転送で解決
+- **今後の対策**: Gitリポジトリのクリーンアップが必要
+
+#### 2. データベーススキーマの管理
+- **課題**: schema.sqlに全テーブル定義が含まれていない
+- **発見**: マイグレーション等で追加されたテーブルがschema.sqlに反映されていない
+- **対処**: 実DBからスキーマをエクスポートして補完
+- **今後の対策**: マイグレーション適用後にschema.sqlを更新する運用ルール確立
+
+#### 3. 環境変数とDocker Compose
+- **重要**: `.env`ファイルはdocker-compose.ymlと同じディレクトリに配置必須
+- **確認**: 環境変数がデフォルト値ではなく`.env`の値を使用していることを確認
+
+### 今後の開発フロー
+
+#### 標準デプロイ手順
+1. **ローカルで開発・テスト**
+2. **Gitにpush**（VPN切り替え時は確認）
+3. **EC2でGit pull**
+   ```bash
+   cd /home/ec2-user/test_kokyaku
+   git pull origin main
+   ```
+4. **必要に応じてDocker再起動**
+   ```bash
+   docker-compose restart backend  # バックエンドのみ
+   # または
+   docker-compose down && docker-compose up -d  # 全体
+   ```
+
+#### データベース変更時
+1. ローカルでマイグレーション適用
+2. schema.sqlを更新
+3. Gitにpush
+4. EC2でpull後、マイグレーション実行
+
+#### 環境変数変更時
+1. ローカルで`.env`更新
+2. EC2に`.env`を転送（scpまたは手動編集）
+3. Docker Compose再起動
+
+### 接続情報まとめ
+
+**EC2アクセス**:
+```bash
+ssh -i /home/h-hiramitsu/projects/test_kokyaku/bl-glasses-01.pem ec2-user@172.19.101.201
+```
+
+**テスト認証情報**:
+- ユーザーコード: manager001
+- パスワード: password
+- 店舗コード: STORE001
+
+**API エンドポイント**:
+- プライベートネットワーク内: http://172.19.101.201
+- ヘルスチェック: http://172.19.101.201/health
+- API: http://172.19.101.201/api/
+
+### 今後の課題
+
+#### 短期
+1. schema.sqlに全テーブル定義を含める
+2. Gitリポジトリのファイル構造をクリーンアップ
+3. init.sql、schema.sql、seed.sqlの自動実行設定
+
+#### 中期
+1. ALBの設定（インフラチーム対応待ち）
+2. SSL証明書の設定
+3. 本番用環境変数の適切な管理
+
+### まとめ（9月24日）
 本日の作業により、SSH接続問題の根本原因（VPN接続）を特定・解決し、ローカル環境の完全復旧を確認できました。AWS EC2環境でのアプリケーション起動については、インフラチームによるEC2性能調査が必要な状況です。開発作業はローカル環境で継続可能なため、並行してインフラ調整を進めることで効率的にプロジェクトを進行できます。
+
+---
+
+## 2025年9月30日（続き） データベース同期とAPI環境変数の完全修正
+
+### 作業概要
+EC2環境で顧客登録と発注管理機能のエラーを解決し、ローカル・EC2・他のPCからのアクセスすべてに対応する環境変数設定を完成させました。
+
+### 実施した作業内容
+
+#### 1. データベース構造の完全同期
+
+**発見した問題**:
+- EC2環境で顧客登録が失敗：`customersテーブルにstore_idカラムが存在しない`
+- テーブル数：ローカル27、EC2 12で不一致
+- フィールド構造も不一致
+
+**解決策**:
+1. **ローカルDBの完全なスキーマをエクスポート**:
+   ```bash
+   pg_dump --schema-only --no-owner --no-acl > complete_schema.sql
+   ```
+2. **EC2のDBをクリーンアップ**:
+   ```sql
+   DROP SCHEMA public CASCADE;
+   CREATE SCHEMA public;
+   ```
+3. **完全なスキーマを適用**:
+   - EC2に転送して実行
+   - テーブル数：27（ローカルと完全一致）
+4. **全データを投入**:
+   ```bash
+   pg_dump --data-only --no-owner --no-acl > complete_data.sql
+   ```
+
+**最終結果**:
+- ✅ テーブル数: 27（ローカル=EC2）
+- ✅ customersテーブル: store_idカラム存在確認
+- ✅ 顧客登録機能: 正常動作
+
+#### 2. API環境変数の問題と解決
+
+**発見した問題**:
+- 発注管理画面で「Failed to fetch」エラー
+- ローカルPC: `404 /api/api/purchase-orders`（二重に`/api`）
+- EC2: CORSエラー（`http://localhost:3001`に直接アクセス）
+
+**根本原因分析**:
+1. **purchaseOrder.service.ts**:
+   - `API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001'`
+   - リクエスト: `${API_BASE}/api/purchase-orders` → `/api/api/...`（二重）
+
+2. **他のサービス（正常動作）**:
+   - `API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001/api'`
+   - リクエスト: `${API_BASE_URL}/stores` → `/api/stores`（正常）
+
+**解決策**:
+
+##### Step 1: フロントエンド環境変数を相対パスに統一
+```bash
+# frontend/.env
+REACT_APP_API_BASE_URL=/api
+REACT_APP_API_URL=/api
+```
+
+メリット:
+- Nginx経由でアクセスするため、どの環境からでもアクセス可能
+- localhost、EC2、他のPC、すべてで動作
+- CORSエラーが発生しない
+
+##### Step 2: purchaseOrder.service.tsの修正
+```typescript
+// 修正前
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+fetch(`${API_BASE}/api/purchase-orders/...`)
+
+// 修正後
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
+fetch(`${API_BASE_URL}/purchase-orders/...`)
+```
+
+変更内容:
+- `API_BASE` → `API_BASE_URL`に統一
+- `/api/`の重複を削除
+- 他のサービスと統一した命名規則
+
+##### Step 3: Docker再ビルドの必要性
+重要な教訓: **Reactアプリは環境変数をビルド時に埋め込む**
+
+```bash
+# 再起動だけでは不十分
+docker-compose restart frontend  # ❌ 環境変数が反映されない
+
+# 正しい方法
+docker-compose down frontend
+docker-compose build --no-cache frontend  # 環境変数を再読込
+docker-compose up -d
+```
+
+#### 3. デプロイフローの確立
+
+**標準フロー**: ローカルPC → Git → EC2
+
+1. **ローカルで開発・テスト**
+2. **VPN切断（ネットワーク切り替え）**
+3. **Gitにpush**:
+   ```bash
+   git add .
+   git commit -m "..."
+   git push origin main
+   ```
+4. **VPN再接続**
+5. **EC2でpull**:
+   ```bash
+   cd /home/ec2-user/test_kokyaku
+   git pull origin main
+   ```
+6. **環境変数ファイル更新**（.envはGitignoreされているため）:
+   ```bash
+   cp .env.example .env
+   # または手動で編集
+   ```
+7. **フロントエンド再ビルド**:
+   ```bash
+   docker-compose down frontend
+   docker-compose build --no-cache frontend
+   docker-compose up -d
+   ```
+
+#### 4. 動作確認結果
+
+**ローカル環境（http://localhost）**:
+- ✅ ログイン
+- ✅ 顧客登録
+- ✅ 顧客一覧
+- ✅ 発注管理（一覧・詳細・新規作成）
+- ✅ 全API正常動作
+
+**EC2環境（http://172.19.101.201）**:
+- ✅ ログイン（manager001 / password / STORE001）
+- ✅ 顧客登録
+- ✅ 顧客一覧
+- ✅ 発注管理（一覧・詳細・新規作成）
+- ✅ 全API正常動作
+
+**他のPCからのアクセス**:
+- ✅ VPN経由でEC2にアクセス可能
+- ✅ 相対パス（/api）により、ホスト名に依存しない設計
+
+### 技術的な学び
+
+#### 1. 環境変数の設計原則
+
+**良い設計（今回の解決策）**:
+```typescript
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
+fetch(`${API_BASE_URL}/stores`)  // → /api/stores
+```
+
+メリット:
+- 相対パスでホスト非依存
+- Nginx経由でバックエンドへプロキシ
+- 環境ごとの設定不要
+
+**悪い設計（以前の実装）**:
+```typescript
+const API_BASE = 'http://localhost:3001';
+fetch(`${API_BASE}/api/stores`)  // → http://localhost:3001/api/stores
+```
+
+問題:
+- 他のPCからアクセス不可
+- CORSエラー
+- 環境ごとに異なるURL
+
+#### 2. Reactの環境変数の仕組み
+
+重要な特徴:
+1. **ビルド時に埋め込まれる**: `.env`を変更しても再起動だけでは反映されない
+2. **`REACT_APP_`プレフィックス必須**: このプレフィックスがない変数は無視される
+3. **ブラウザに公開される**: 秘密情報は含めない
+
+正しい更新手順:
+```bash
+# 1. .envを編集
+vim frontend/.env
+
+# 2. 再ビルド（必須！）
+docker-compose build --no-cache frontend
+
+# 3. 起動
+docker-compose up -d frontend
+```
+
+#### 3. Nginxプロキシの役割
+
+設定（nginx/conf.d/default.conf）:
+```nginx
+location /api/ {
+    proxy_pass http://backend:3001/api/;
+}
+```
+
+動作:
+1. ブラウザ → `http://172.19.101.201/api/stores`
+2. Nginx → `http://backend:3001/api/stores`
+3. バックエンド → レスポンス
+4. Nginx → ブラウザ
+
+メリット:
+- フロントエンドはバックエンドのポートを知る必要がない
+- CORS問題が発生しない（同一オリジン）
+- ホスト名・ポート変更に強い
+
+#### 4. データベース同期の重要性
+
+教訓:
+- `schema.sql`だけでは不十分（マイグレーションで追加されたテーブルが含まれない）
+- 実DBからの完全エクスポートが確実
+- テーブル数だけでなくフィールド構造も確認が必要
+
+今後の対策:
+```bash
+# 定期的に実DBからschema.sqlを更新
+pg_dump --schema-only > backend/database/schema.sql
+git add backend/database/schema.sql
+git commit -m "Update schema.sql from live database"
+```
+
+### ファイル変更履歴
+
+#### 変更したファイル
+
+1. **frontend/.env**:
+   ```env
+   REACT_APP_API_BASE_URL=/api
+   REACT_APP_API_URL=/api
+   ```
+
+2. **frontend/.env.example**:
+   - 相対パスの推奨設定を追加
+   - コメントで使用方法を明記
+
+3. **frontend/src/services/purchaseOrder.service.ts**:
+   - `API_BASE` → `API_BASE_URL`に変更
+   - `/api/`の重複を全て削除（14箇所）
+
+#### Gitコミット履歴
+
+```bash
+# 1. .env.exampleの更新
+commit 2be3135: "Update .env.example to use relative API paths"
+
+# 2. purchaseOrder.serviceの修正
+commit 059e4d4: "Fix purchaseOrder.service to use correct API_BASE_URL"
+```
+
+### 接続情報まとめ（更新版）
+
+**ローカル環境**:
+- URL: http://localhost
+- API: http://localhost/api
+- ログイン: manager001 / password / STORE001
+
+**EC2環境**:
+- URL: http://172.19.101.201
+- API: http://172.19.101.201/api
+- SSH: `ssh -i bl-glasses-01.pem ec2-user@172.19.101.201`
+- ログイン: manager001 / password / STORE001
+- VPN接続必須
+
+**共通設定**:
+- PostgreSQL: 27テーブル
+- テストデータ: 店舗6件、ユーザー4件、顧客10件、発注10件
+
+### 今後の推奨事項
+
+#### 短期（次回セッション）
+1. ✅ データベース完全同期 - 完了
+2. ✅ 環境変数の統一 - 完了
+3. ✅ 発注管理機能の動作確認 - 完了
+4. 他の画面（在庫管理、入庫管理等）の動作確認
+5. WebSocket接続の設定（現在は警告が出ている）
+
+#### 中期
+1. schema.sqlの自動更新スクリプト作成
+2. CI/CDパイプラインの構築（GitHub Actions）
+3. 本番用環境変数の暗号化管理
+4. ALB・SSL証明書の設定（インフラチーム連携）
+
+#### 長期
+1. Reactアプリの本番ビルド（現在はdevelopment build）
+2. パフォーマンス最適化
+3. モニタリング・ロギング強化
+4. バックアップ・リストア手順の確立
+
+### まとめ（9月30日）
+
+本日の作業で、EC2環境とローカル環境の完全な動作確認が完了しました。主な成果：
+
+1. **データベース完全同期**: 27テーブル、全フィールドが一致
+2. **環境変数の統一**: 相対パスによりどの環境からでもアクセス可能
+3. **全機能の動作確認**: ログイン、顧客管理、発注管理すべて正常動作
+4. **デプロイフローの確立**: ローカル → Git → EC2の標準手順確立
+
+次回セッションからは、この環境をベースに新機能開発や他画面の動作確認を進められます。
