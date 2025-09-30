@@ -1,7 +1,7 @@
 import { ApiResponse, Order, PurchaseOrder, Supplier, PurchaseOrderStatus, CreateStockPurchaseOrderItem, StockLevel, StockLevelAlert } from '../types';
 import { authService } from './auth.service';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '/api';
 
 class PurchaseOrderService {
   private getAuthHeaders() {
@@ -31,7 +31,7 @@ class PurchaseOrderService {
       if (params?.toDate) queryParams.append('toDate', params.toDate);
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/available-orders?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders/available-orders?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -68,7 +68,7 @@ class PurchaseOrderService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -92,7 +92,7 @@ class PurchaseOrderService {
   async sendPurchaseOrder(purchaseOrderId: string): Promise<ApiResponse<PurchaseOrder>> {
     try {
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/${purchaseOrderId}/send`,
+        `${API_BASE_URL}/purchase-orders/${purchaseOrderId}/send`,
         {
           method: 'PUT',
           headers: this.getAuthHeaders()
@@ -129,7 +129,7 @@ class PurchaseOrderService {
       if (params?.toDate) queryParams.append('toDate', params.toDate);
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -158,7 +158,7 @@ class PurchaseOrderService {
    */
   async getPurchaseOrderById(id: string): Promise<ApiResponse<PurchaseOrder>> {
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/${id}`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -184,7 +184,7 @@ class PurchaseOrderService {
     orderIds: string[];
   }): Promise<ApiResponse<PurchaseOrder>> {
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(data)
@@ -207,7 +207,7 @@ class PurchaseOrderService {
    */
   async updateStatus(id: string, status: PurchaseOrderStatus): Promise<ApiResponse<PurchaseOrder>> {
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders/${id}/status`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/${id}/status`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ status })
@@ -231,7 +231,7 @@ class PurchaseOrderService {
    */
   async getSuppliers(): Promise<ApiResponse<Supplier[]>> {
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders/suppliers`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/suppliers`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -269,7 +269,7 @@ class PurchaseOrderService {
       if (params?.toDate) queryParams.append('toDate', params.toDate);
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/statistics?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders/statistics?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -297,7 +297,7 @@ class PurchaseOrderService {
     stockItems: CreateStockPurchaseOrderItem[];
   }): Promise<ApiResponse<PurchaseOrder>> {
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders/stock-replenishment`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-orders/stock-replenishment`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(data)
@@ -340,7 +340,7 @@ class PurchaseOrderService {
       if (params?.sort) queryParams.append('sort', params.sort);
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/stock-levels?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders/stock-levels?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -377,7 +377,7 @@ class PurchaseOrderService {
       if (params?.offset) queryParams.append('offset', params.offset.toString());
 
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/stock-alerts?${queryParams.toString()}`,
+        `${API_BASE_URL}/purchase-orders/stock-alerts?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
@@ -416,7 +416,7 @@ class PurchaseOrderService {
   }>>> {
     try {
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/suggested-orders?storeId=${storeId}`,
+        `${API_BASE_URL}/purchase-orders/suggested-orders?storeId=${storeId}`,
         {
           method: 'GET',
           headers: this.getAuthHeaders()
