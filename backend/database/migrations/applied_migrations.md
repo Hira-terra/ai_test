@@ -5,15 +5,17 @@
 |------------------------|--------|--------|------|
 | schema.sql (初期構築) | 2025-08-08 | - | 初期セットアップ |
 | 001_add_order_status_values.sql | 適用済み（開発中に手動実行） | - | ALTER TYPEで追加済み |
+| 002_add_photo_to_image_type.sql | 2025-10-03 | Claude | image_type enumに'photo'を追加（開発中に自動適用済み） |
 
 ## EC2環境 (172.19.101.201)
 | マイグレーションファイル | 適用日 | 適用者 | 備考 |
 |------------------------|--------|--------|------|
 | schema.sql (初期構築) | 2025-09-26 | Claude | 初期デプロイ |
 | 001_add_order_status_values.sql | 2025-09-26 | Claude | 手動でALTER TYPE実行済み |
+| 002_add_photo_to_image_type.sql | 2025-10-03 | Claude | **要適用** |
 
 ## 未適用のマイグレーション
-なし
+- EC2環境: 002_add_photo_to_image_type.sql
 
 ## 注意事項
 - EC2環境への新規マイグレーション適用時は、必ずこのファイルを更新すること
