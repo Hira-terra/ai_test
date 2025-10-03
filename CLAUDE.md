@@ -3516,6 +3516,14 @@ commit 059e4d4: "Fix purchaseOrder.service to use correct API_BASE_URL"
 - SSH: `ssh -i bl-glasses-01.pem ec2-user@172.19.101.201`
 - ログイン: manager001 / password / STORE001
 - VPN接続必須
+- pgAdmin: http://172.19.101.201:5050 (ログイン: admin@example.com / admin)
+
+**pgAdmin データベース接続情報**:
+- Host: `postgres` (Dockerコンテナ名)
+- Port: `5432`
+- Database: `glasses_store_db`
+- Username: `glasses_user`
+- Password: `glasses_pass`
 
 **共通設定**:
 - PostgreSQL: 27テーブル
@@ -3552,3 +3560,457 @@ commit 059e4d4: "Fix purchaseOrder.service to use correct API_BASE_URL"
 4. **デプロイフローの確立**: ローカル → Git → EC2の標準手順確立
 
 次回セッションからは、この環境をベースに新機能開発や他画面の動作確認を進められます。
+---
+
+## 2025年10月3日 顧客詳細画面の画像表示問題の解決
+
+### 問題
+- 画像アップロードは成功するが、顧客詳細画面で画像が表示されない
+- 新しくアップロードした画像は表示されるが、古い画像が表示されなかった
+
+### 原因
+**Nginx設定の問題**: 静的ファイルの正規表現パターンマッチが `/uploads/` より優先されていた
+
+```nginx
+# 問題のあった設定
+location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    proxy_pass http://frontend;  # ← /uploads/*.png もフロントエンドに転送されていた
+}
+```
+
+このため、`/uploads/customers/*.png` へのリクエストが：
+1. `.png` にマッチ
+2. フロントエンドに転送
+3. Content-Type: text/html として返される
+4. ブラウザが画像として表示できない
+
+### 解決策
+
+**nginx/conf.d/default.conf の修正**:
+```nginx
+# 修正後（/uploads/を除外）
+location ~* ^(?!/uploads/).*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    proxy_pass http://frontend;
+}
+```
+
+### 確認方法
+
+1. **APIレスポンスの確認**:
+   ```bash
+   curl http://localhost/api/customers/:id/images
+   ```
+   → `imageUrl` フィールドが含まれているか確認
+
+2. **画像URLの直接アクセス**:
+   ```bash
+   curl -I http://localhost/uploads/customers/xxx.png
+   ```
+   → `Content-Type: image/png` が返されるか確認
+
+3. **ブラウザでの確認**:
+   - F12 → Network タブ
+   - 画像リクエストのContent-Typeを確認
+   - スーパーリロード（Ctrl+Shift+R）でキャッシュクリア
+
+### 実施した修正
+
+1. **backend/src/repositories/customer.repository.ts** (626行目):
+   - `imageUrl` フィールドを生成するコードは既に実装済みだった
+   - TypeScriptのビルド問題かと思われたが、実際はNginx設定の問題だった
+
+2. **nginx/conf.d/default.conf** (108行目):
+   - 静的ファイルパターンから `/uploads/` を除外
+   - 正規表現に否定先読み `(?!/uploads/)` を追加
+
+3. **Nginxの再起動**:
+   ```bash
+   docker-compose restart nginx
+   docker exec glasses_nginx nginx -s reload
+   ```
+
+### 動作確認結果
+
+- ✅ 画像アップロード成功
+- ✅ `imageUrl` がAPIレスポンスに含まれる
+- ✅ `/uploads/customers/*.png` が正しく画像として配信される
+- ✅ 顧客詳細画面で画像が表示される
+
+### 学んだこと
+
+1. **Nginxのlocation優先順位**:
+   - 正規表現パターン (`~*`) は記述順に評価される
+   - より具体的なパス (`/uploads/`) を先に配置する必要がある
+   - または正規表現で除外パターンを明示する
+
+2. **デバッグ方法**:
+   - ブラウザのNetwork TabでContent-Typeを確認
+   - curlで直接APIとファイルにアクセス
+   - Consoleでfetchを実行してレスポンスデータを確認
+
+3. **画像ファイルの管理**:
+   - データベースに記録がない古いファイルが残る可能性がある
+   - 定期的なクリーンアップが必要
+
+### 次回のための確認事項
+
+- 画像削除時にファイルも物理削除されているか確認
+- 不要ファイルの自動クリーンアップスクリプトの検討
+- 画像アップロード時のエラーハンドリング強化
+
+
+---
+
+## 本日の作業まとめ（2025年10月3日）
+
+### 作業内容
+**顧客詳細画面の画像アップロード・表示機能の修正**
+
+### 発生していた問題
+1. 画像アップロード自体は成功する
+2. しかし、アップロードした画像が顧客詳細画面で表示されない
+3. APIレスポンスには`imageUrl`が含まれているはずだった
+
+### 原因の特定
+
+#### 調査プロセス
+1. **APIレスポンス確認**：
+   - ブラウザのConsoleで直接APIを叩いて確認
+   - `imageUrl: "/uploads/customers/xxx.png"`が正しく返されていることを確認
+
+2. **画像URL直接アクセス**：
+   ```bash
+   curl -I http://localhost/uploads/customers/xxx.png
+   ```
+   - `Content-Type: text/html` と返されていた（本来は`image/png`であるべき）
+
+3. **根本原因**：
+   - Nginx設定で、静的ファイルのパターンマッチが`/uploads/`より優先されていた
+   - `.png`にマッチして、フロントエンドに転送されていた
+
+### 実施した修正
+
+#### 1. Nginx設定の修正（nginx/conf.d/default.conf）
+
+**変更前**：
+```nginx
+location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    proxy_pass http://frontend;
+}
+```
+
+**変更後**：
+```nginx
+# 静的ファイルのキャッシュ設定（/uploadsは除外）
+location ~* ^(?!/uploads/).*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    proxy_pass http://frontend;
+}
+```
+
+**変更内容**：
+- 正規表現に否定先読み`(?!/uploads/)`を追加
+- `/uploads/`配下のファイルはこのパターンにマッチしないようにした
+
+#### 2. バックエンドコードの確認
+
+**backend/src/repositories/customer.repository.ts (624-643行目)**：
+```typescript
+private transformToCustomerImage(row: any): CustomerImage {
+  // ファイルパスからAPIのURLを生成
+  const imageUrl = row.file_path ? `/uploads/customers/${row.file_name}` : undefined;
+
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    fileName: row.file_name,
+    filePath: row.file_path,
+    imageUrl: imageUrl,  // ← これが正しく実装されていた
+    fileSize: row.file_size,
+    mimeType: row.mime_type,
+    imageType: row.image_type,
+    title: row.title,
+    description: row.description,
+    capturedDate: row.captured_date,
+    hasAnnotations: row.has_annotations || false,
+    uploadedBy: row.uploaded_by,
+    createdAt: row.created_at
+  };
+}
+```
+
+- `imageUrl`生成ロジックは既に正しく実装されていた
+- 問題はNginx設定だった
+
+#### 3. 実行したコマンド
+
+```bash
+# 1. Nginx設定ファイル修正
+vim nginx/conf.d/default.conf
+
+# 2. Nginxコンテナの再起動
+docker-compose restart nginx
+
+# 3. Nginx設定のリロード
+docker exec glasses_nginx nginx -s reload
+
+# 4. 動作確認
+curl -I http://localhost/uploads/customers/xxx.png
+# → Content-Type: image/png になることを確認
+```
+
+### 動作確認結果
+
+✅ **全て正常動作**：
+1. 画像アップロード成功
+2. APIレスポンスに`imageUrl`が含まれる
+3. 画像URLに直接アクセスすると正しく画像が表示される（Content-Type: image/png）
+4. 顧客詳細画面の「メモ・画像」タブで画像が表示される
+
+### EC2環境への反映について
+
+#### 今回の変更内容
+- ✅ データベーススキーマ変更なし
+- ✅ マイグレーション不要
+- ✅ 既存データへの影響なし
+
+#### EC2反映手順（次回実施）
+
+```bash
+# ローカルでコミット
+git add .
+git commit -m "Fix: 顧客画像表示機能の修正（Nginx設定とimageUrl生成）"
+git push origin main
+
+# EC2にSSH接続
+ssh -i bl-glasses-01.pem ec2-user@172.19.101.201
+
+# コードを取得
+cd /home/ec2-user/test_kokyaku
+git pull origin main
+
+# コンテナ再ビルド・再起動
+docker-compose build --no-cache backend
+docker-compose restart backend nginx
+```
+
+### 変更ファイル一覧
+
+```
+modified:   CLAUDE.md
+modified:   backend/src/controllers/customer.controller.ts (ログ追加のみ)
+modified:   nginx/conf.d/default.conf (重要な修正)
+modified:   frontend/src/pages/CustomerDetailPage.tsx (表示ロジック確認)
+```
+
+**主要な変更**：
+- `nginx/conf.d/default.conf`: 静的ファイルパターンから`/uploads/`を除外
+
+### 学んだこと
+
+1. **Nginxのlocation優先順位**：
+   - 正規表現パターン(`~*`)は記述順ではなく、マッチング順で評価される
+   - より具体的なパス(`/uploads/`)を明示的に除外する必要がある
+
+2. **デバッグ手法**：
+   - ブラウザのNetwork TabでContent-Typeを確認
+   - curlで直接APIとファイルにアクセス
+   - Consoleでfetchを実行してレスポンスデータを確認
+
+3. **マイグレーション管理**：
+   - `backend/database/migrations/`でスキーマ変更を管理
+   - `applied_migrations.md`で適用状況を追跡
+   - 今後DBスキーマ変更時はマイグレーションファイルを作成
+
+### 次回作業時の確認事項
+
+1. **未コミットの変更をコミット**：
+   ```bash
+   git add nginx/conf.d/default.conf CLAUDE.md
+   git commit -m "Fix: 顧客画像表示機能の修正（Nginx設定）"
+   git push origin main
+   ```
+
+2. **EC2環境への反映**（上記手順参照）
+
+3. **その他の画面の動作確認**：
+   - 在庫管理
+   - 入庫管理
+   - WebSocket接続の設定
+
+### 接続情報（変更なし）
+
+**ローカル環境**:
+- URL: http://localhost
+- API: http://localhost/api
+- ログイン: manager001 / password / STORE001
+
+**EC2環境**:
+- URL: http://172.19.101.201
+- SSH: `ssh -i bl-glasses-01.pem ec2-user@172.19.101.201`
+- ログイン: manager001 / password / STORE001
+- VPN接続必須
+
+### 作業時間
+- 開始: 2025年10月3日
+- 終了: 2025年10月3日
+- 作業内容: 顧客画像表示機能の修正完了
+
+---
+
+## 2025年10月3日 - カメラ撮影機能の実装
+
+### 実装内容
+
+顧客詳細画面の「メモ・画像」タブにカメラ撮影機能を追加しました。
+
+#### 新規作成ファイル
+1. **`frontend/src/components/CameraCapture.tsx`**
+   - カメラ撮影用のダイアログコンポーネント
+   - デバイスのカメラ（フロント/リア）を使用して写真を撮影
+   - MediaStream APIを使用したリアルタイムビデオプレビュー
+   - カメラ切り替え機能（複数カメラがある場合）
+   - 撮影後のプレビュー表示と撮り直し機能
+   - 撮影画像をJPEG形式でFile objectとして返却
+
+#### 変更ファイル
+1. **`frontend/src/pages/CustomerDetailPage.tsx`**
+   - CameraCaptureコンポーネントのインポート
+   - カメラダイアログの開閉状態管理 (`cameraDialogOpen`)
+   - `handleCameraCapture`関数の追加（撮影画像のアップロード処理）
+   - UIに「カメラで撮影」ボタンを追加（緑色のカードUI）
+   - カメラ撮影ダイアログの配置
+
+### 機能詳細
+
+#### カメラ撮影の流れ
+1. 「カメラで撮影」ボタンをクリック
+2. ブラウザがカメラアクセス許可を要求
+3. カメラが起動し、リアルタイムプレビューを表示
+4. 撮影ボタン（白い丸ボタン）で写真を撮影
+5. プレビューで確認後、「この写真を使用」をクリック
+6. 画像が自動的に顧客画像としてアップロード
+7. 画像リストに追加表示
+
+#### 実装の特徴
+- **複数カメラ対応**: フロント/リアカメラの切り替えが可能
+- **高画質**: 1920x1080の解像度で撮影
+- **JPEG圧縮**: 品質90%でファイルサイズを最適化
+- **エラーハンドリング**: カメラアクセス失敗時の適切なエラー表示
+- **リソース管理**: ダイアログクローズ時にMediaStreamを適切に停止
+
+### UI/UX
+
+#### 画像管理セクションのボタン配置
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   既存画像  │  │ カメラ撮影  │  │ 画像を選択  │
+│            │  │   (緑色)    │  │   (青色)    │
+└─────────────┘  └─────────────┘  └─────────────┘
+```
+
+- **カメラで撮影**: 緑色のカード、カメラアイコン
+- **画像を選択**: 青色のカード、ファイルアイコン
+
+### 技術仕様
+
+#### 使用API
+- **MediaDevices API**: カメラアクセス
+- **getUserMedia()**: ビデオストリーム取得
+- **enumerateDevices()**: カメラデバイス一覧取得
+- **Canvas API**: ビデオフレームの画像化
+
+#### ブラウザ互換性
+- HTTPS環境またはlocalhostでのみ動作（セキュリティ要件）
+- モダンブラウザ（Chrome, Firefox, Safari, Edge）でサポート
+
+### 動作確認結果
+
+✅ **ローカル環境で動作確認済み**：
+1. カメラダイアログが正常に開く
+2. カメラアクセス許可が正しく機能
+3. リアルタイムプレビューが表示される
+4. 撮影ボタンで写真を撮影できる
+5. プレビュー画面で撮り直しが可能
+6. 撮影した画像が正常にアップロードされる
+7. 画像リストに追加表示される
+
+### EC2環境への反映について
+
+#### 今回の変更内容
+- ✅ データベーススキーマ変更なし
+- ✅ マイグレーション不要
+- ✅ 新規コンポーネント追加
+- ✅ 既存機能との共存
+
+#### EC2反映手順
+
+```bash
+# ローカルでコミット＆プッシュ
+git add .
+git commit -m "Feature: 顧客画像管理にカメラ撮影機能を追加"
+git push origin main
+
+# EC2にSSH接続
+ssh -i bl-glasses-01.pem ec2-user@172.19.101.201
+
+# コードを取得
+cd /home/ec2-user/test_kokyaku
+git pull origin main
+
+# フロントエンドコンテナのみ再ビルド・再起動
+docker-compose build --no-cache frontend
+docker-compose restart frontend
+
+# 動作確認
+docker-compose ps
+```
+
+### 変更ファイル一覧
+
+```
+新規作成:
+  frontend/src/components/CameraCapture.tsx
+
+変更:
+  frontend/src/pages/CustomerDetailPage.tsx
+  CLAUDE.md
+```
+
+### 注意事項
+
+1. **HTTPS必須**: EC2環境でカメラを使用するにはHTTPS化が必要
+   - 現在はHTTPのため、EC2環境ではカメラ機能は動作しません
+   - 将来的にSSL証明書を設定する必要があります
+
+2. **カメラ許可**: 初回アクセス時、ブラウザがカメラアクセスの許可を求めます
+
+3. **デバイス制限**: カメラがないPCでは「画像を選択」のみ利用可能
+
+### 次回作業予定
+
+1. ✅ **ローカル環境でのカメラ撮影機能の動作確認**
+2. **Gitコミット＆プッシュ**
+3. **EC2環境への展開**
+4. **（将来）EC2環境のHTTPS化**（カメラ機能を使用する場合）
+
+### 接続情報（変更なし）
+
+**ローカル環境**:
+- URL: http://localhost
+- API: http://localhost/api
+- ログイン: manager001 / password / STORE001
+
+**EC2環境**:
+- URL: http://172.19.101.201
+- SSH: `ssh -i bl-glasses-01.pem ec2-user@172.19.101.201`
+- ログイン: manager001 / password / STORE001
+- VPN接続必須
+
+### 作業時間
+- 開始: 2025年10月3日
+- 終了: 2025年10月3日
+- 作業内容: カメラ撮影機能の実装完了
+
+---
+**次回セッション開始時**: このセクションから作業を再開してください。
+
