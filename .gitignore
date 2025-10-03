@@ -43,6 +43,7 @@ logs/
 data/
 backups/
 *.sql
+!backend/database/migrations/*.sql
 *.sqlite
 *.db
 
