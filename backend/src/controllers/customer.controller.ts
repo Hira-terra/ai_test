@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { CustomerService } from '../services/customer.service';
 import { logger } from '../utils/logger';
-import { 
-  Customer, 
-  Prescription, 
-  CustomerImage, 
+import {
+  Customer,
+  Prescription,
+  CustomerImage,
   CustomerMemo,
   CustomerSearchParams,
   UUID
@@ -12,6 +12,7 @@ import {
 import { validateUuidParam } from '../validators/customer.validator';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
 // 認証済みリクエスト型定義
@@ -513,8 +514,9 @@ export class CustomerController {
       const result = await this.customerService.getCustomerImages(customerId);
 
       if (result.success) {
-        logger.debug(`[${operationId}] 顧客画像一覧取得API成功`, { 
-          count: result.data?.length 
+        logger.debug(`[${operationId}] 顧客画像一覧取得API成功`, {
+          count: result.data?.length,
+          firstImage: result.data?.[0]
         });
         res.status(200).json(result);
       } else {
@@ -587,6 +589,61 @@ export class CustomerController {
 
     } catch (error) {
       logger.error(`[${operationId}] 顧客画像削除APIエラー:`, error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'SERVER_ERROR',
+          message: 'システムエラーが発生しました。'
+        }
+      });
+    }
+  };
+
+  // ============================================
+  // 購入履歴管理エンドポイント
+  // ============================================
+
+  /**
+   * 顧客購入履歴取得
+   * GET /api/customers/:customerId/orders
+   */
+  getCustomerOrders = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const operationId = `controller-orders-list-${Date.now()}`;
+    const userId = req.user?.userId;
+    const customerId = req.params.customerId;
+
+    logger.debug(`[${operationId}] 顧客購入履歴取得API開始`, { customerId, userId });
+
+    try {
+      // UUIDパラメータ検証
+      validateUuidParam({ id: customerId });
+
+      if (!customerId) {
+        logger.warn(`[${operationId}] customerIdが不正です`);
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: '顧客IDが必要です。'
+          }
+        });
+        return;
+      }
+
+      const result = await this.customerService.getCustomerOrders(customerId);
+
+      if (result.success) {
+        logger.debug(`[${operationId}] 顧客購入履歴取得API成功`, {
+          count: result.data?.length
+        });
+        res.status(200).json(result);
+      } else {
+        logger.warn(`[${operationId}] 顧客購入履歴取得API失敗`, { error: result.error });
+        res.status(result.error?.code === 'NOT_FOUND' ? 404 : 500).json(result);
+      }
+
+    } catch (error) {
+      logger.error(`[${operationId}] 顧客購入履歴取得APIエラー:`, error);
       res.status(500).json({
         success: false,
         error: {
@@ -779,6 +836,18 @@ export class CustomerController {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = process.env.CUSTOMER_IMAGES_DIR || './uploads/customers';
+
+    // ディレクトリが存在しない場合は作成
+    if (!fs.existsSync(uploadDir)) {
+      try {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        logger.info(`[MULTER] アップロードディレクトリを作成しました: ${uploadDir}`);
+      } catch (error) {
+        logger.error(`[MULTER] ディレクトリ作成エラー: ${uploadDir}`, error);
+        return cb(error as Error, uploadDir);
+      }
+    }
+
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {

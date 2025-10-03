@@ -222,5 +222,11 @@ export const apiCustomerService = {
   deleteCustomerMemo: async (customerId: string, memoId: string): Promise<ApiResponse<void>> => {
     console.info('✅ Using REAL API for memo deletion');
     return await apiClient.delete(API_ENDPOINTS.CUSTOMERS.MEMO_DELETE(customerId, memoId));
+  },
+
+  // 顧客購入履歴取得
+  getCustomerOrders: async (customerId: string): Promise<ApiResponse<any[]>> => {
+    console.info('✅ Using REAL API for customer orders');
+    return await apiClient.get(`/customers/${customerId}/orders`);
   }
 };

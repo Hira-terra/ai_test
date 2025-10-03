@@ -164,6 +164,20 @@ export class CustomerRoutes {
     );
 
     // ============================================
+    // 購入履歴管理ルート
+    // ============================================
+
+    /**
+     * 顧客購入履歴取得
+     * GET /api/customers/:customerId/orders
+     */
+    this.router.get(
+      '/:customerId/orders',
+      authMiddleware,
+      this.customerController.getCustomerOrders
+    );
+
+    // ============================================
     // メモ管理ルート
     // ============================================
 
@@ -260,6 +274,7 @@ export class CustomerRoutes {
         'GET /customers/:customerId/images',
         'POST /customers/:customerId/images',
         'DELETE /customers/:customerId/images/:imageId',
+        'GET /customers/:customerId/orders',
         'GET /customers/:customerId/memos',
         'POST /customers/:customerId/memos',
         'DELETE /customers/:customerId/memos/:memoId'

@@ -426,10 +426,10 @@ export const customerImageSchema = Joi.object({
     }),
 
   imageType: Joi.string()
-    .valid('face', 'glasses', 'prescription', 'other')
+    .valid('face', 'glasses', 'prescription', 'photo', 'other')
     .default('other')
     .messages({
-      'any.only': '画像タイプは face・glasses・prescription・other から選択してください'
+      'any.only': '画像タイプは face・glasses・prescription・photo・other から選択してください'
     }),
 
   title: Joi.string()
@@ -451,6 +451,14 @@ export const customerImageSchema = Joi.object({
     .allow(null)
     .messages({
       'date.format': '撮影日は有効な日付を入力してください'
+    }),
+
+  uploadedBy: Joi.string()
+    .uuid()
+    .required()
+    .messages({
+      'string.guid': 'アップロードユーザーIDは有効なUUID形式である必要があります',
+      'any.required': 'アップロードユーザーIDは必須です'
     })
 });
 
@@ -574,15 +582,19 @@ export const validatePrescription = (data: any) => {
 };
 
 export const validateCustomerImage = (data: any) => {
+  console.log('🔍 [VALIDATOR] Validating customer image data:', data);
+
   const { error, value } = customerImageSchema.validate(data, {
     abortEarly: false,
     stripUnknown: true
   });
-  
+
   if (error) {
+    console.error('❌ [VALIDATOR] Customer image validation error:', error.details);
     throw new ValidationError('画像データの検証に失敗しました', error.details);
   }
-  
+
+  console.log('✅ [VALIDATOR] Customer image validation successful');
   return value;
 };
 

@@ -426,6 +426,7 @@ export interface CustomerImage {
   customerId: UUID;
   fileName: string;
   filePath: string;
+  imageUrl?: string;
   fileSize: number;
   mimeType: string;
   imageType: 'face' | 'glasses' | 'prescription' | 'other';

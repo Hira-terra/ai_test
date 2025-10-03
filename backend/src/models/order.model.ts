@@ -412,7 +412,7 @@ export class OrderRepository {
     logger.info('[OrderRepository] 初期化完了');
   }
 
-  private transformToOrder(row: OrderModelData & { 
+  private transformToOrder(row: OrderModelData & {
     customer_last_name?: string;
     customer_first_name?: string;
     customer_code?: string;
@@ -420,6 +420,8 @@ export class OrderRepository {
     store_code?: string;
     created_by_name?: string;
     created_by_user_code?: string;
+    actual_balance_amount?: number;
+    total_discount_amount?: number;
   }): Order {
     return {
       id: row.id,
@@ -450,7 +452,7 @@ export class OrderRepository {
       taxAmount: row.tax_amount,
       totalAmount: row.total_amount,
       paidAmount: row.paid_amount,
-      balanceAmount: row.balance_amount,
+      balanceAmount: row.actual_balance_amount !== undefined ? row.actual_balance_amount : row.balance_amount,
       paymentMethod: row.payment_method,
       notes: row.notes,
       items: [], // 別途取得
@@ -471,7 +473,7 @@ export class OrderRepository {
       } as User : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at
-    };
+    } as any; // actual_balance_amountを保持するため
   }
 
   private transformToOrderItem(row: OrderItemModelData & {
@@ -581,20 +583,29 @@ export class OrderRepository {
       paramIndex++;
     }
 
-    if (orderNumber) {
-      whereClause += ` AND o.order_number ILIKE $${paramIndex}`;
-      queryParams.push(`%${orderNumber}%`);
-      paramIndex++;
-    }
+    // 受注番号と顧客名の検索（OR条件）
+    if (orderNumber && customerName && orderNumber === customerName) {
+      // 同じ検索語が両方に指定された場合はOR条件で検索
+      whereClause += ` AND (o.order_number ILIKE $${paramIndex} OR CONCAT(c.last_name, ' ', c.first_name) ILIKE $${paramIndex + 1} OR CONCAT(c.last_name, c.first_name) ILIKE $${paramIndex + 2})`;
+      queryParams.push(`%${orderNumber}%`, `%${customerName}%`, `%${customerName}%`);
+      paramIndex += 3;
+    } else {
+      // 個別に指定された場合はAND条件
+      if (orderNumber) {
+        whereClause += ` AND o.order_number ILIKE $${paramIndex}`;
+        queryParams.push(`%${orderNumber}%`);
+        paramIndex++;
+      }
 
-    if (customerName) {
-      whereClause += ` AND (CONCAT(c.last_name, ' ', c.first_name) ILIKE $${paramIndex} OR CONCAT(c.last_name, c.first_name) ILIKE $${paramIndex + 1})`;
-      queryParams.push(`%${customerName}%`, `%${customerName}%`);
-      paramIndex += 2;
+      if (customerName) {
+        whereClause += ` AND (CONCAT(c.last_name, ' ', c.first_name) ILIKE $${paramIndex} OR CONCAT(c.last_name, c.first_name) ILIKE $${paramIndex + 1})`;
+        queryParams.push(`%${customerName}%`, `%${customerName}%`);
+        paramIndex += 2;
+      }
     }
 
     const query = `
-      SELECT 
+      SELECT
         o.*,
         c.last_name as customer_last_name,
         c.first_name as customer_first_name,
@@ -602,11 +613,18 @@ export class OrderRepository {
         s.name as store_name,
         s.store_code,
         u.name as created_by_name,
-        u.user_code as created_by_user_code
+        u.user_code as created_by_user_code,
+        COALESCE(discount_data.total_discount, 0) as total_discount_amount,
+        (o.total_amount - COALESCE(discount_data.total_discount, 0) - o.paid_amount) as actual_balance_amount
       FROM orders o
       LEFT JOIN customers c ON o.customer_id = c.id
       LEFT JOIN stores s ON o.store_id = s.id
       LEFT JOIN users u ON o.created_by = u.id
+      LEFT JOIN (
+        SELECT order_id, SUM(discount_amount) as total_discount
+        FROM order_discounts
+        GROUP BY order_id
+      ) discount_data ON o.id = discount_data.order_id
       WHERE ${whereClause}
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}

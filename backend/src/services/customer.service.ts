@@ -1,30 +1,32 @@
-import { 
-  Customer, 
-  Prescription, 
-  CustomerImage, 
+import {
+  Customer,
+  Prescription,
+  CustomerImage,
   CustomerMemo,
   CustomerSearchParams,
   UUID,
   ApiResponse,
   PaginationInfo,
-  FabricCanvasData
+  FabricCanvasData,
+  Order
 } from '../types';
-import { 
-  CustomerRepository, 
-  PrescriptionRepository, 
+import {
+  CustomerRepository,
+  PrescriptionRepository,
   CustomerImageRepository,
-  CustomerMemoRepository 
+  CustomerMemoRepository
 } from '../repositories/customer.repository';
 import { logger } from '../utils/logger';
-import { 
+import {
   validateCustomerCreate,
   validateCustomerUpdate,
   validateCustomerSearch,
   validatePrescription,
   validateCustomerImage,
   validateCustomerMemo,
-  ValidationError 
+  ValidationError
 } from '../validators/customer.validator';
+import { OrderService } from './order.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -33,12 +35,14 @@ export class CustomerService {
   private prescriptionRepo: PrescriptionRepository;
   private imageRepo: CustomerImageRepository;
   private memoRepo: CustomerMemoRepository;
+  private orderService: OrderService;
 
   constructor() {
     this.customerRepo = new CustomerRepository();
     this.prescriptionRepo = new PrescriptionRepository();
     this.imageRepo = new CustomerImageRepository();
     this.memoRepo = new CustomerMemoRepository();
+    this.orderService = new OrderService();
     logger.info('[CustomerService] 初期化完了');
   }
 
@@ -774,6 +778,68 @@ export class CustomerService {
   }
 
   // ============================================
+  // 購入履歴管理サービス
+  // ============================================
+
+  /**
+   * 顧客の購入履歴（受注履歴）を取得
+   */
+  async getCustomerOrders(customerId: string): Promise<ApiResponse<Order[]>> {
+    const operationId = `service-customer-orders-${Date.now()}`;
+
+    try {
+      logger.info(`[${operationId}] 顧客購入履歴取得開始`, { customerId });
+
+      // 顧客の存在確認
+      const customerResult = await this.customerRepo.findById(customerId);
+      if (!customerResult) {
+        logger.warn(`[${operationId}] 顧客が見つかりません`, { customerId });
+        return {
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: '顧客が見つかりません。'
+          }
+        };
+      }
+
+      // 顧客の受注を取得（日付降順）
+      const ordersResult = await this.orderService.getOrders(
+        { customerId, limit: 100 },
+        operationId
+      );
+
+      if (!ordersResult.success) {
+        logger.error(`[${operationId}] 受注取得エラー`, { error: ordersResult.error });
+        return ordersResult;
+      }
+
+      logger.info(`[${operationId}] 顧客購入履歴取得成功`, {
+        customerId,
+        orderCount: ordersResult.data?.length
+      });
+
+      return {
+        success: true,
+        data: ordersResult.data || [],
+        meta: ordersResult.meta
+      };
+
+    } catch (error: any) {
+      logger.error(`[${operationId}] 顧客購入履歴取得サービスエラー:`, error);
+
+      return {
+        success: false,
+        error: {
+          code: 'SERVER_ERROR',
+          message: '購入履歴の取得に失敗しました。',
+          details: error.message
+        }
+      };
+    }
+  }
+
+  // ============================================
   // プライベートヘルパーメソッド
   // ============================================
 
@@ -781,18 +847,18 @@ export class CustomerService {
     // 電話番号重複チェック
     if (customerData.phone || customerData.mobile) {
       const searchQuery = customerData.phone || customerData.mobile;
-      const duplicates = await this.customerRepo.search({ 
-        phone: searchQuery, 
-        limit: 1 
+      const duplicates = await this.customerRepo.search({
+        phone: searchQuery,
+        limit: 1
       });
 
       if (duplicates.customers.length > 0) {
-        logger.warn(`顧客重複検出:`, { 
+        logger.warn(`顧客重複検出:`, {
           phone: searchQuery,
-          existingCustomer: duplicates.customers[0]?.customerCode 
+          existingCustomer: duplicates.customers[0]?.customerCode
         });
         throw new ValidationError(
-          '同じ電話番号の顧客が既に登録されています。', 
+          '同じ電話番号の顧客が既に登録されています。',
           [{ message: '重複する電話番号です' }]
         );
       }

@@ -622,11 +622,15 @@ export class CustomerImageRepository {
   }
 
   private transformToCustomerImage(row: any): CustomerImage {
+    // ファイルパスからAPIのURLを生成
+    const imageUrl = row.file_path ? `/uploads/customers/${row.file_name}` : undefined;
+
     return {
       id: row.id,
       customerId: row.customer_id,
       fileName: row.file_name,
       filePath: row.file_path,
+      imageUrl: imageUrl,
       fileSize: row.file_size,
       mimeType: row.mime_type,
       imageType: row.image_type,
